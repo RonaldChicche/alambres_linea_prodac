@@ -1,0 +1,8 @@
+.venv/bin/
+.venv/include/
+.venv/lib/
+.venv/pyvenv.cfg
+wsdl/
+.venv/Scripts/
+
+
