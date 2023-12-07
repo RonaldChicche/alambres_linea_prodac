@@ -23,10 +23,10 @@ def register_blueprints(app):
 
 def register_extensions(app, PlcParser):
     ptz_application.start(app)
-    ptz_application.start_plc_thread(PlcParser)
-    esmeril_application.start_plc_thread(PlcParser)
+    # ptz_application.start_plc_thread(PlcParser)
+    # esmeril_application.start_plc_thread(PlcParser)
     
-    ptz_app_tail.start_plc_thread(PlcParser)
+    # ptz_app_tail.start_plc_thread(PlcParser)
 
 
 

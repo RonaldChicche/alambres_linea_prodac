@@ -27,11 +27,11 @@ class PTZWebApp:
         self.current_file_path = os.path.dirname(os.path.abspath(__file__))        
         self.wsdl_dir = os.path.join(self.current_file_path, 'python-onvif2-zeep', 'wsdl')
 
-        try:
-            self.connect()
-        except Exception as e:
-            print(f"Error connecting to camera: {e}")
-            self.camera_con = False
+        # try:
+        #     self.connect()
+        # except Exception as e:
+        #     print(f"Error connecting to camera: {e}")
+        #     self.camera_con = False
     
     def __del__(self):
         self.stop_video_capture()
@@ -404,11 +404,11 @@ class PTZWebApp2:
         self.cap = None
         self.current_file_path = os.path.dirname(os.path.abspath(__file__))
         self.wsl_dir = os.path.join(self.current_file_path, 'python-onvif2-zeep', 'wsdl')
-        try: 
-            self.connect()
-        except Exception as e:
-            print(f"Error connecting to camera: {e}")
-            self.camera_con = False
+        # try: 
+        #     self.connect()
+        # except Exception as e:
+        #     print(f"Error connecting to camera: {e}")
+        #     self.camera_con = False
 
     def __del__(self):
         # stop thread

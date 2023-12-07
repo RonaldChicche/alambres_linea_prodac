@@ -13,15 +13,15 @@ import os
 import time
 import socket
 
-ctrlEjes=[] 
-ctrlEjes.append(FMC4030(1,'192.168.90.20',8088))
-time.sleep(1)
-ctrlEjes.append(FMC4030(2,'192.168.90.21',8088)) 
-time.sleep(1)
-ctrlEjes.append(FMC4030(3,'192.168.90.22',8088)) 
-time.sleep(1)
-ctrlEjes.append(FMC4030(4,'192.168.90.23',8088)) 
-time.sleep(1)
+# ctrlEjes=[] 
+# ctrlEjes.append(FMC4030(1,'192.168.90.20',8088))
+# time.sleep(1)
+# ctrlEjes.append(FMC4030(2,'192.168.90.21',8088)) 
+# time.sleep(1)
+# ctrlEjes.append(FMC4030(3,'192.168.90.22',8088)) 
+# time.sleep(1)
+# ctrlEjes.append(FMC4030(4,'192.168.90.23',8088)) 
+# time.sleep(1)
 
 app = Flask(__name__)
 
@@ -308,11 +308,12 @@ def main_apps(app):
         return jsonify({"funcion": "Step"+str(StepId), "estado": step_status})
 
 
-CtrlParseS701 = PLCDataParser(1,'192.168.90.10', 71, 116, 0, 70, 450, 0, ctrlEjes)
+# CtrlParseS701 = PLCDataParser(1,'192.168.90.10', 71, 116, 0, 70, 450, 0, ctrlEjes)
+CtrlParseS701 = None
 app_config = config_dict['Production']
 app = create_app(app_config, CtrlParseS701)
 
 if __name__ == "__main__":
-    main_apps(app)
+    # main_apps(app)
     app.run(host='0.0.0.0')
     
