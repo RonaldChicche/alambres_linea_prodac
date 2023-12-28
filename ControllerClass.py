@@ -6,24 +6,24 @@ from ClientS7 import *
 from Proceso import *
 import socket
 import time
-import signal
+# import signal
 
 
-class TimeoutException(Exception): 
-    pass
+# class TimeoutException(Exception): 
+#     pass
 
-def timeout_handler(signum, frame):
-    raise TimeoutException
+# def timeout_handler(signum, frame):
+#     raise TimeoutException
 
-signal.signal(signal.SIGALRM, timeout_handler)
+# signal.signal(signal.SIGALRM, timeout_handler)
 
 
 
 class FMC4030:
 
     # Ruta de driver para controlador FMC4030
-    so_file = "/home/ubuntu/maqui/fmc4030-Drive/libFMC4030-Lib.so"
-    fmc4030 = CDLL(so_file)    
+    # so_file = "/home/ubuntu/maqui/fmc4030-Drive/libFMC4030-Lib.so"
+    # fmc4030 = CDLL(so_file)    
     ms = machine_status() # Instancia de estado
     
     # Número del controlador, este número de identificación es único

@@ -28,8 +28,8 @@
   }
 
   .input-container {
-    display: flex;
-    flex-wrap: wrap;
+    /* display: flex; */
+    flex: 0 0 auto;
     justify-content: center;
     align-items: center;
     gap: 10px;
@@ -37,10 +37,11 @@
 
   .button-container {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
+    flex-direction: row;
+    justify-content: flex-end;
     align-items: center;
     gap: 10px;
+    margin-right: 20px;
   }
 
   .video-container {
@@ -49,7 +50,7 @@
     align-items: center;
     margin: 20px;
     /* background-color: black; */
-    height: 500px; /* Replace with your desired height */
+    height: 400px; /* Replace with your desired height */
     overflow: hidden;
   }
 

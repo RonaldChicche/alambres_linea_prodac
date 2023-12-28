@@ -9,6 +9,7 @@ from flask_login import login_required
 from jinja2 import TemplateNotFound
 
 
+@blueprint.route('/')
 @blueprint.route('/index')
 def index():
 

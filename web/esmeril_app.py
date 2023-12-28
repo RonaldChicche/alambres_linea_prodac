@@ -21,7 +21,8 @@ class EsmerilWebApp:
 
     def __del__(self):
         print(" ++++++++++++++++++ Terminando hilo de control de esmeril")
-        self.thread_plc.join()
+        if self.thread_plc is not None:
+            self.thread_plc.join()
 
     def start_plc_thread(self, plc_parser):
         print(" ++++++++++++++++++ Iniciando hilo de control de esmeril")

@@ -2,9 +2,11 @@ from flask import Flask, Response, render_template
 import os
 import cv2
 import time
+import base64
 import threading
 import numpy as np
 from flask import request
+import cv2 as cv
 # from .CamAIClass import CamAI
 from onvif2 import ONVIFCamera, ONVIFService, ONVIFError
 from .ImagePro import measure_welding, measure_tail
@@ -12,81 +14,89 @@ from .ImagePro import measure_welding, measure_tail
 
 class PTZWebApp:
     def __init__(self):
-        self.url = 0
         self.presets = None
         self.current_preset = None
         self.velocity = 1
-        self.num_im = 0
-        self.video_capture = None
-        self.image = None
-        self.connected = False
         self.ip = "192.168.90.108"
         self.user = "admin"
         self.password = "Bertek@206036"
         self.url = "rtsp://admin:Bertek@206036@192.168.90.108"
         self.current_file_path = os.path.dirname(os.path.abspath(__file__))        
         self.wsdl_dir = os.path.join(self.current_file_path, 'python-onvif2-zeep', 'wsdl')
-
-        # try:
-        #     self.connect()
-        # except Exception as e:
-        #     print(f"Error connecting to camera: {e}")
-        #     self.camera_con = False
+        self.video_stream = None
+        self.cap = None
+        self.imagen_resultado = None
+        self.camera_response = {
+            'streaming': False,
+            'trigger': False,
+            'connected': False,
+            'ok': False,
+            'distancia': 0,
+            'error': False,
+            'error_code': 0,
+            'imagen': None
+        }
+        self.ptz_connected = False
+        self.camera_con = False
+        try:
+            self.connect_ptz()
+        except Exception as e:
+            print(f"Error connecting to camera: {e}")
+            self.ptz_connected = False
     
     def __del__(self):
-        self.stop_video_capture()
-        cv2.destroyAllWindows()
-        # stop thread
         self.thread_plc.join()
+        if self.camera_response['streaming']:
+            self.video_stream.release()
+        if self.camera_response['connected']:
+            self.cap.release()
 
 
-    def connect(self):
+    def connect_ptz(self):
         self.onvif_cam = ONVIFCamera(self.ip, 80, self.user, self.password, wsdl_dir=self.wsdl_dir)
         self.ptz_service = self.onvif_cam.create_ptz_service()
         self.media_service = self.onvif_cam.create_media_service()
         self.imaging_service = self.onvif_cam.create_imaging_service()
         self.cam_token = self.media_service.GetProfiles()[0].token
         self.load_presets()
-        self.camera_con = True
-        
+        self.ptz_connected = True
 
-    def start_video_capture(self, data:dict):
-        if self.connected == False:
-            self.ip = data['ip']
-            self.user = data['user']
-            self.password = data['pass']
-            self.url = f'rtsp://{self.user}:{self.password}@{self.ip}'
-            self.wsdl_dir = os.path.join(self.current_file_path, 'python-onvif2-zeep', 'wsdl')
-            try:
-                self.onvif_cam = ONVIFCamera(self.ip, 80, self.user, self.password, wsdl_dir=self.wsdl_dir)
-                print(f"ONVIF: {self.onvif_cam}")
-                self.ptz_service = self.onvif_cam.create_ptz_service()
-                self.media_service = self.onvif_cam.create_media_service()
-                self.imaging_service = self.onvif_cam.create_imaging_service()
-                self.cam_token = self.media_service.GetProfiles()[0].token
-                self.vid_token = self.media_service.GetVideoSources()[0].token
-                print(f"Connecting to -> {self.url} ")
-            except Exception as e:
-                print(f"Error connecting to camera: {e}")
-                
+    def connect_video_capture(self):
+        self.video_stream = cv2.VideoCapture(self.url)
+        if not self.video_stream.isOpened():
+            print("Error opening video stream or file")
+            return False
+        return True
+    
+    def read_video_capture(self):
+        ret, frame = self.video_stream.read()
+        if not ret:
+            print("Error capturing frame from video stream")
+            self.video_stream.release()
+            self.camera_response['streaming'] = self.connect_video_capture()
+            return None
+        frame = cv2.imencode('.jpg', frame)[1].tobytes()
+        frame_base64 = base64.b64encode(frame).decode('utf-8')
+        return frame_base64
 
-    def stop_video_capture(self):
-        # stop video capture and onvif camera
-        if self.video_capture is not None:  
-            self.video_capture.release()
-            self.video_capture = None
-            self.connected = False
 
     def plc_control(self):
         self.prev_state = False
+        # connect streaming ...
+        # self.video_stream = cv2.VideoCapture(self.url)
         while True:
+            # ---------- Reading video stream
+            # video_frame = self.read_video_capture()
+            # if video_frame is not None:
+            #     self.socketio.emit('video_frame', {'frame': video_frame}, namespace='/welding_cam')
+            
             # Verificar coneccion e intentar reconectar
-            if self.camera_con == False:
+            if self.ptz_connected == False:
                 try:
-                    self.connect()
+                    self.connect_ptz()
                 except Exception as e:
                     print(f"Error connecting to camera: {e}")
-                    self.camera_con = False
+                    self.ptz_connected = False
                     self.plc_parser.cam_struc["ERROR"] = 1
                     time.sleep(5)
                     continue
@@ -100,17 +110,20 @@ class PTZWebApp:
 
             if self.plc_parser.ctw_cam['TRIG_WELD'] ^ self.prev_state:    
                 self.cap = cv2.VideoCapture(self.url)
+                self.camera_response['connected'] = self.cap.isOpened()
                 # Error de conexion
                 if not self.cap.isOpened():
                     print("Error opening video stream or file")
-                    self.plc_parser.stw_cam["OK_TAIL"] = False
-                    self.plc_parser.stw_cam["ERROR_TAIL"] = True
-                    self.plc_parser.cam_struc["TAIL_MEASURE"] = -1
+                    self.plc_parser.stw_cam["OK_WELD"] = False
+                    self.plc_parser.stw_cam["ERROR_WELD"] = True
+                    self.plc_parser.cam_struc["WELD_MEASURE"] = -1
                     self.plc_parser.cam_struc["ERROR"] = 1
-                    self.prev_state = self.plc_parser.ctw_cam["TRIG_TAIL"]
-                    self.camera_con = False
+                    self.prev_state = self.plc_parser.ctw_cam["TRIG_WELD"]
+                    self.ptz_connected = False
                     continue
-                dist, err = self.measure_weld()
+                dist, err, img_res = self.measure_weld()
+                # Save image for clients
+                self.imagen_resultado = img_res
                 if err == 0:
                     self.plc_parser.stw_cam["OK_WELD"] = True
                     self.plc_parser.stw_cam["ERROR_WELD"] = False
@@ -123,13 +136,94 @@ class PTZWebApp:
                 self.plc_parser.cam_struc["ERROR"] = err
                 self.prev_state = self.plc_parser.ctw_cam["TRIG_WELD"]
                 self.cap.release()
+                self.camera_response['connected'] = False
                 print("-----------------------------------------------------", self.plc_parser.cam_struc)
+
+    def plc_control2(self):
+        self.trig = False
+        self.ptz_connected = False
+        self.cam_resp = {
+            'ok': False,
+            'dist': 0,
+            'err': False,
+            'err_code': 0,
+            'img': None
+        }
+
+        self.prev_state = False
+        while True:
+            # Verificar coneccion e intentar reconectar
+            # if self.camera_con == False:
+            #     try:
+            #         self.camera_connect()
+            #     except Exception as e:
+            #         print(f"Error connecting to camera: {e}")
+            #         self.camera_con = False
+            #         self.plc_parser.cam_struc["ERROR"] = 1
+            #         time.sleep(5)
+            #         continue
             
+            # send trigger state
+            # self.socketio.emit('cam_weld_trig', {'value': self.trig})
+
+            if self.trig == False:
+                self.cam_resp['ok'] = False
+                self.cam_resp['err'] = False
+                self.cam_resp['err_code'] = 0
+                self.cam_resp['dist'] = 0
+                self.cam_resp['img'] = None
+                self.prev_state = False
+                
+                # print("---- Terminated  -> ", self.cam_resp['dist'])
+
+
+            if self.trig ^ self.prev_state:    
+                self.cap = cv2.VideoCapture(0)
+                self.camera_con = self.cap.isOpened()
+                # Error de conexion
+                if not self.camera_con:
+                    print("Error opening video stream or file")                    
+                    self.prev_state = self.trig
+                    self.cam_resp['ok'] = False
+                    self.cam_resp['err'] = True
+                    self.cam_resp['err_code'] = 1
+                    self.cam_resp['dist'] = -1
+                    self.cam_resp['img'] = None
+                    continue
+                # dist, err = self.measure_weld()
+                ret, img = self.cap.read()
+                # cut image by half
+                img = img[0:480, 0:640]
+                frame = cv2.imencode('.jpg', img)[1].tobytes()
+                # print("Enviando frame")
+                frame_base64 = base64.b64encode(frame).decode('utf-8')
+
+                dist = 34.5 + self.cam_resp['dist']
+                err = 0
+
+                if err == 0:
+                    self.cam_resp['ok'] = True
+                    self.cam_resp['err'] = False
+                    self.cam_resp['dist'] = dist
+                else:
+                    self.cam_resp['ok'] = False
+                    self.cam_resp['err'] = True
+                    self.cam_resp['dist'] = -1
+
+                self.cam_resp['err_code'] = err
+                self.cam_resp['img'] = frame_base64
+                self.prev_state = self.trig
+                self.cap.release()
+                # self.socketio.emit('cam_weld_analy_con', {'value': False})
+                self.camera_con = False
+                print("-----------------------------------------------------", "Shooted")
+
+
         
     # thread declaration and initialization
     def start_plc_thread(self, plc_parser):
         self.plc_parser = plc_parser
-        self.thread_plc = threading.Thread(target=self.plc_control)
+        self.thread_plc = threading.Thread(target=self.plc_control2)
         self.thread_plc.start()
 
     def load_presets(self):
@@ -256,71 +350,102 @@ class PTZWebApp:
             else:
                 print('Error capturing frame from video stream')
         
+        if len(img_return) > 0:
+            # fusiona las imagenes en una sola en vertical
+            img_return = np.concatenate(img_return, axis=0)
+            
+
         # Verify if the measure is correct
         if len(lenghts) == 0 or np.mean(lenghts) < 0:
             err = 3
             return -1, err
             
-        return np.mean(lenghts), err
+        return np.mean(lenghts), err. img_return
 
 
-    def start(self, app):
+    def start(self, app, socketio):
+        self.socketio = socketio
+
+        # Send a list of names on connection with a new client
+        # @self.socketio.on('connect', namespace='/welding_cam')
+        # def connect():
+        #     print("Client connected")
+        #     self.camera_con = False
+        #     # self.presets = self.load_presets()
+        #     self.socketio.emit('init', {'streaming_state': self.camera_con, 'presets': self.presets}, namespace='/welding_cam')
+
+        @app.route('/states_welding', methods=['GET'])
+        def states_welding():
+            # update camera_response keys
+            # self.camera_response['trigger'] = self.trig
+            # self.camera_response['connected'] = self.ptz_connected
+            # self.camera_response['ok'] = self.cam_resp['ok']
+            # self.camera_response['distancia'] = self.cam_resp['dist']
+            # self.camera_response['error'] = self.cam_resp['err']
+            # self.camera_response['error_code'] = self.cam_resp['err_code']
+            # self.camera_response['imagen'] = self.cam_resp['img']
+
+            # update camera_response keys with plc_parser
+            self.camera_response['trigger'] = self.plc_parser.ctw_cam["TRIG_WELD"]
+            # self.camera_response['connected'] = self.
+            self.camera_response['ok'] = self.plc_parser.stw_cam["OK_WELD"]
+            self.camera_response['distancia'] = self.plc_parser.cam_struc["WELD_MEASURE"]
+            self.camera_response['error'] = self.plc_parser.stw_cam["ERROR_WELD"]
+            self.camera_response['error_code'] = self.plc_parser.cam_struc["ERROR"]
+            self.camera_response['imagen'] = self.imagen_resultado
+
+            # return sel.cam_resp consider that cam_resp is a dict and i only want to send its keys with their values
+            return {'status': 200, 'camera_response': self.camera_response}
+
+        # Handle post /shoot_welding request
+        @app.route('/shoot_welding', methods=['POST'])
+        def shoot_welding():
+            self.trig = not self.trig
+            print("TRIG", self.trig)
+            return {'status': 200}
+            # try:
+            #     # data = dict(request.get_json())
+            #     # print(data)
+            #     # dist, dx1, dx2 = self.measure_weld()
+            #     # print(dist, dx1, dx2)
+            #     # return {'status': 200, 'distance': dist, 'dx1': dx1, 'dx2': dx2}
+            #     self.cap = cv2.VideoCapture(0)
+            #     ret, img = self.cap.read()
+            #     if ret:
+            #         img_base64 = base64.b64encode(img).decode('utf-8')
+            #         self.socketio.emit('image_shoot', {'frame': img_base64, 'dist': 34.6}, namespace='/welding_cam')
+            #         return {'status': 200}
+            #     else:
+            #         return {'status': 500, 'error': 1}
+            # except Exception as e:
+            #     return {'status': 500, 'error': str(e)}
+
         # Define the route for the video stream
-        @app.route('/video_feed')
-        def video_feed():
-            def generate():
-                prev_frame = None
-                while True:
-                    if self.video_capture is not None:
-                        # Capture a frame from the video stream
-                        ret, frame = self.video_capture.read()
+        # @app.route('/video_feed')
+        # def video_feed():
+        #     cap = cv2.VideoCapture(0)
+        #     while True:
+        #         ret, frame = cap.read()
+        #         if not ret:
+        #             print("Error capturing frame from video stream")
+        #             break
 
-                        if ret:
-                            # Encode the frame as a JPEG image
-                            ret, jpeg = cv2.imencode('.jpg', frame)
-                            self.image = frame
-                            if ret:
-                                # Yield the JPEG image as a byte stream
-                                yield (b'--frame\r\n'
-                                    b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-                                prev_frame = frame
-                            else:
-                                print('Error encoding frame as JPEG')
-                        else:
-                            print('Error capturing frame from video stream')
-                    else:
-                        if prev_frame is not None:
-                            # Create a black image of the same size as the previous frame
-                            black_frame = np.zeros_like(prev_frame)
-
-                            # Encode the black frame as a JPEG image
-                            ret, jpeg = cv2.imencode('.jpg', black_frame)
-
-                            if ret:
-                                # Yield the JPEG image as a byte stream
-                                yield (b'--frame\r\n'
-                                    b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-                            else:
-                                print('Error encoding black frame as JPEG')
-                        # else:
-                            # print('No previous frame to use for black image')
-
-            # Return the byte stream as a Flask response
-            return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+        #         frame = cv2.imdecode('.jpg', frame)[1].tobytes()
+        #         socketio.emit('video_frame', frame, namespace='/video')
         
-        @app.route('/video_start', methods=['POST'])
-        def video_start():
-            try:
-                data = dict(request.get_json())
-                print(data)
-                self.start_video_capture(data)
-                list_presets = self.load_presets()
-                print(list_presets)
-                self.connected = True
-                print(self.connected)
-                return {'status': 200, 'presets': list_presets}
-            except Exception as e:
-                return {'status': 500, 'error': str(e)}
+        # @app.route('/video_start', methods=['POST'])
+        # def video_start():
+        #     try:
+        #         data = dict(request.get_json())
+        #         print(data)
+        #         self.start_video_capture(data)
+        #         list_presets = self.load_presets()
+        #         print(list_presets)
+        #         self.connected = True
+        #         print(self.connected)
+        #         return {'status': 200}
+        #     except Exception as e:
+        #         return {'status': 500, 'error': str(e)}
 
         
         @app.route('/video_stop')
@@ -400,32 +525,52 @@ class PTZWebApp2:
         self.port = port
         self.user = user
         self.password = password
-        self.camera = None
+        self.onvif_cam = None
         self.cap = None
         self.current_file_path = os.path.dirname(os.path.abspath(__file__))
         self.wsl_dir = os.path.join(self.current_file_path, 'python-onvif2-zeep', 'wsdl')
-        # try: 
-        #     self.connect()
+        self.url = None
+        self.video_stream = None
+        self.cap = None
+        self.imagen_resultado = None
+        self.camera_response = {
+            'streaming': False,
+            'trigger': False,
+            'connected': False,
+            'ok': False,
+            'distancia': 0,
+            'error': False,
+            'error_code': 0,
+            'imagen': None
+        }
+        # try:
+        #     self.connect_ptz()
         # except Exception as e:
         #     print(f"Error connecting to camera: {e}")
-        #     self.camera_con = False
+        #     self.ptz_connected = False
+
+        try: 
+            self.connect()
+        except Exception as e:
+            print(f"Error connecting to camera: {e}")
+            self.camera_con = False
 
     def __del__(self):
         # stop thread
-        self.thread_plc.join()
+        self.thread_plc.join()        
         
 
     def connect(self):
-        self.camera = ONVIFCamera(self.ip, self.port, self.user, self.password, wsdl_dir=self.wsl_dir)
+        self.onvif_cam = ONVIFCamera(self.ip, self.port, self.user, self.password, wsdl_dir=self.wsl_dir)
         self.url = self.get_stream_url()
         print("URL Stream:", self.url)
         self.camera_con = True
 
     def get_service_info(self):
-        return self.camera.devicemgmt.GetServices(False)
+        return self.onvif_cam.devicemgmt.GetServices(False)
 
     def get_stream_url(self):
-        media_service = self.camera.create_media_service()
+        media_service = self.onvif_cam.create_media_service()
         profiles = media_service.GetProfiles()
         main_profile = profiles[0]
         stream_uri = media_service.GetStreamUri({'StreamSetup': {'Stream': 'RTP-Unicast', 'Transport': {'Protocol': 'RTSP'}}, 'ProfileToken': main_profile.token})
@@ -467,7 +612,9 @@ class PTZWebApp2:
                     self.camera_con = False
                     continue
                     
-                lenght_tail, error = self.measure_border()
+                lenght_tail, error, img_res = self.measure_border()
+                # Save image for clients
+                self.imagen_resultado = img_res
                 if error == 0:                    
                     self.plc_parser.stw_cam["OK_TAIL"] = True
                     self.plc_parser.stw_cam["ERROR_TAIL"] = False
@@ -487,7 +634,8 @@ class PTZWebApp2:
                 # print("-----------------------------------------------------", self.plc_parser.cam_struc)
             time.sleep(0.5)
 
-    def start_plc_thread(self, plc_parser):
+    def start_plc_thread(self, plc_parser, socketio):
+        self.socketio = socketio
         self.plc_parser = plc_parser
         self.thread_plc = threading.Thread(target=self.plc_control)
         self.thread_plc.start()
@@ -512,21 +660,51 @@ class PTZWebApp2:
                     lenghts.append(lenght_tail)
                     img_return.append(img) ### For de web page
         
+        if len(img_return) > 0:
+            # fusiona las imagenes en una sola en vertical
+            img_return = np.concatenate(img_return, axis=0)
+
         # Verify if measure is correct
         if len(lenghts) == 0 or np.mean(lenghts) < 0:
             error = 3
             return 0, error
         
-        return np.mean(lenghts), error
+        return np.mean(lenghts), error, img_return
 
+    def start(self, app, socketio):
+        self.socketio = socketio
 
-    def show_video(self):
-        while True:
-            ret, frame = self.cap.read()
-            if ret:
-                cv2.imshow('frame', frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-            else:
-                print('Error capturing frame from video stream')
-        cv2.destroyAllWindows()
+        # Send a list of names on connection with a new client
+        # @self.socketio.on('connect', namespace='/cola_cam')
+        # def connect():
+        #     print("Client connected")
+        #     self.camera_con = False
+        #     self.socketio.emit('init', {'streaming_state': self.camera_con}, namespace='/cola_cam')
+
+        @app.route('/states_tail', methods=['GET'])
+        def states_tail():
+            # update camera_response keys
+            self.camera_response['trigger'] = self.plc_parser.ctw_cam["TRIG_TAIL"]
+            self.camera_response['connected'] = self.camera_con
+            self.camera_response['ok'] = self.plc_parser.stw_cam["OK_TAIL"]
+            self.camera_response['distancia'] = self.plc_parser.cam_struc["TAIL_MEASURE"]
+            self.camera_response['error'] = self.plc_parser.stw_cam["ERROR_TAIL"]
+            self.camera_response['error_code'] = self.plc_parser.cam_struc["ERROR"]
+            self.camera_response['imagen'] = self.imagen_resultado
+
+            # return sel.cam_resp consider that cam_resp is a dict and i only want to send its keys with their values
+            return {'status': 200, 'camera_response': self.camera_response}
+
+        # Handle post /shoot_welding request
+        @app.route('/shoot_tail', methods=['POST'])
+        def shoot_tail():
+            self.trig = not self.trig
+            print("TRIG", self.trig)
+            return {'status': 200}
+
+        # @app.route('/border_measure', methods=['GET'])
+        # def border_measure():
+        #     """Try to measure the welding 5 times, if it fails return an error"""
+        #     lenght_tail, error = self.measure_border()
+        #     if error == 0:
+        #         return {'status': 200, 'lenght}

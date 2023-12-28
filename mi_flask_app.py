@@ -1,4 +1,5 @@
 from flask import Flask, render_template, Response, session, request, redirect, url_for, flash, jsonify
+from flask_socketio import SocketIO
 from ctypes import *
 from ControllerClass import *
 from ClientS7 import *
@@ -23,7 +24,8 @@ import socket
 # ctrlEjes.append(FMC4030(4,'192.168.90.23',8088)) 
 # time.sleep(1)
 
-app = Flask(__name__)
+# app = Flask(__name__)
+# socketio = SocketIO(app)
 
 # @app.route("/")
 # def hello():
@@ -311,9 +313,10 @@ def main_apps(app):
 # CtrlParseS701 = PLCDataParser(1,'192.168.90.10', 71, 116, 0, 70, 450, 0, ctrlEjes)
 CtrlParseS701 = None
 app_config = config_dict['Production']
-app = create_app(app_config, CtrlParseS701)
+app, socketio = create_app(app_config, CtrlParseS701)
 
 if __name__ == "__main__":
     # main_apps(app)
-    app.run(host='0.0.0.0')
+    # app.run(host='0.0.0.0')
+    socketio.run(app, host='0.0.0.0', port=5000)
     
