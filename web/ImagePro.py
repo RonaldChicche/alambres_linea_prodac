@@ -37,7 +37,7 @@ def measure_welding(img):
     center_x = img.shape[1] / 2
     # Encontrar los contornos en la imagen
     mid_blobs, _ = cv2.findContours(mid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    best_mid_left, best_mid_right = get_best_blob(mid_blobs, center_x)
+    best_mid_left, best_mid_right = get_best_weld_blob(mid_blobs, center_x)
 
     # Get contours
     contours = [best_mid_right, best_mid_left]
