@@ -72,7 +72,7 @@ def measure_welding(img):
             cv2.rectangle(img_ori, (x, y), (x+w, y+h), (255, 0, 255), 2)
     
     
-    if obj[0][2] * obj[0][3] < 7000 or obj[1][2] * obj[1][3] < 7000:
+    if obj[0][2] * obj[0][3] < 1000 or obj[1][2] * obj[1][3] < 1000:
         print("Low accuracy 3")
         err = 3
         return img_ori, None, None, None, err
