@@ -7,6 +7,7 @@ import numpy as np
 # - Obstacle machine area free detector
 
 def measure_welding(img):
+    err = 0
     # Cut, resize layer
     x1, y1, x2, y2 = 820, 450, 995, 700
     img = img[y1:y2, x1:x2]
@@ -48,7 +49,8 @@ def measure_welding(img):
     # print(obj)
     if len(obj) != 2:
         print("Low accuracy 2")
-        return img_ori, None, None, None
+        err = 2
+        return img_ori, None, None, None, err
     
     # Sort the objects by position
     if obj[0][0] < obj[1][0]:
@@ -72,13 +74,15 @@ def measure_welding(img):
     
     if obj[0][2] * obj[0][3] < 7000 or obj[1][2] * obj[1][3] < 7000:
         print("Low accuracy 3")
-        return img_ori, None, None, None
+        err = 3
+        return img_ori, None, None, None, err
     
     
     if obj[0][2] + dist + obj[1][2] > img_w:
         print("Low accuracy 4:", end=" ")
         print(f"{obj[0][0]} + {dist} + {obj[1][2]} > {img_w}")
-        return img_ori, None, None, None
+        err = 4
+        return img_ori, None, None, None, err
 
     color1 = (255, 255, 0)
     color2 = (0, 255, 0)
@@ -98,7 +102,7 @@ def measure_welding(img):
     img_ori = cv2.putText(img_ori, t2, (int(3*img_w/5), int(img_h/2) + 20), font, 0.4, color2, 1, cv2.LINE_AA)
     img_ori = cv2.putText(img_ori, t3, (int(img_w/2) + 30, int(img_h/2) - 40), font, 0.4, (255,0, 255), 1, cv2.LINE_AA)
     
-    return img_ori, dist_mm, dx1, dx2
+    return img_ori, dist_mm, dx1, dx2, err
 
 def get_best_weld_blob(blobs, center_x):
     if blobs and len(blobs) >= 2:
