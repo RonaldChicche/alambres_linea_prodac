@@ -12,10 +12,9 @@ import base64
 
 # Rutna para intentar conectar camaras
 
-ptz_application = PTZWebApp()
-ptz_app_tail = PTZWebApp2("192.168.90.109", 80, "admin", "Bertek@206036")
+ptz_application = CameraWelding("192.168.90.108", "admin", "Bertek@206036")
+ptz_app_tail = CameraTail("192.168.90.109", "admin", "Bertek@206036")
 esmeril_application = EsmerilWebApp()
-
 
 
 def register_blueprints(app):
@@ -23,22 +22,16 @@ def register_blueprints(app):
     module = import_module('web.home.routes')
     app.register_blueprint(module.blueprint)
 
-def register_extensions(app, PlcParser, socketio):
-    ptz_application.start(app, socketio)
+def register_extensions(app, PlcParser):
+    ptz_application.start(app)
     ptz_application.start_plc_thread(PlcParser)
-    # esmeril_application.start_plc_thread(PlcParser, socketio)
-    
-    # ptz_app_tail.start_plc_thread(PlcParser)
-
-    # socketio.on_namespace(CameraNamespace('/welding_cam'))
-    # socketio.on_namespace(CameraNamespace('/cola_cam'))
-
-
+    ptz_app_tail.start(app)
+    ptz_app_tail.start_plc_thread(PlcParser)
+    esmeril_application.start_plc_thread(PlcParser)
 
 def create_app(config, PlcParser):
     app = Flask(__name__)
-    socketio = SocketIO(app)
     app.config.from_object(config)
-    register_extensions(app, PlcParser, socketio)
     register_blueprints(app)
-    return app, socketio
+    register_extensions(app, PlcParser)
+    return app

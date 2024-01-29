@@ -57,72 +57,92 @@ function get_cam_weld_response() {
 // execute each second
 setInterval(get_cam_weld_response, 500);
 
+
+
 // SocketIO streaming connection
-const socket_weld = io.connect('http://' + document.domain + ':' + location.port);
+// const socket_weld = io.connect('http://' + document.domain + ':' + location.port);
 
-socket_weld.on('connect', function() {
-  console.log('Connected cam welding streaming socket');
-});
+// socket_weld.on('connect', function() {
+//   console.log('Connected cam welding streaming socket');
+// });
 
-socket_weld.on('disconnect', function() {
-  console.log('Socket cam welding conecction lost');
-});
+// socket_weld.on('disconnect', function() {
+//   console.log('Socket cam welding conecction lost');
+// });
 
-socket_weld.on('video_frame', function(data) {
-  // console.log('Received frame');
-  document.getElementById('video-stream-weld').src = 'data:image/jpeg;base64,' + data.frame;
-});
+// socket_weld.on('video_frame', function(data) {
+//   // console.log('Received frame');
+//   document.getElementById('video-stream-weld').src = 'data:image/jpeg;base64,' + data.frame;
+// });
 
-socket_weld.on('init', function(data) {
-  // data has 2 field: streaming_state, presets; print it in the console  
-  var table = document.getElementById('presets-items');
-  table.innerHTML = '';
+// socket_weld.on('init', function(data) {
+//   // data has 2 field: streaming_state, presets; print it in the console  
+//   var table = document.getElementById('presets-items');
+//   table.innerHTML = '';
   
-  for (var i = 0; i < data.presets.length; i++) {
-    const row = document.createElement('tr');
+//   for (var i = 0; i < data.presets.length; i++) {
+//     const row = document.createElement('tr');
 
-    // Create a new div element with the preset ID and name
-    const div = document.createElement('div');
-    div.classList.add('d-flex', 'px-2', 'py-1');
-    div.id = `preset-${i}`;
-    div.innerText = data.presets[i];
+//     // Create a new div element with the preset ID and name
+//     const div = document.createElement('div');
+//     div.classList.add('d-flex', 'px-2', 'py-1');
+//     div.id = `preset-${i}`;
+//     div.innerText = data.presets[i];
 
-    // Add a click event listener to the div element
-    div.addEventListener('click', () => {
-      //print the innner text of the div
-      console.log(div.innerText);
-      // Send the data to the server
-      fetch('/goto_preset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: div.innerText
-        })
-      })
-    });
+//     // Add a click event listener to the div element
+//     div.addEventListener('click', () => {
+//       //print the innner text of the div
+//       console.log(div.innerText);
+//       // Send the data to the server
+//       fetch('/goto_preset', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json'
+//         },
+//         body: JSON.stringify({
+//           name: div.innerText
+//         })
+//       })
+//     });
 
-    // Append the div element to the row element
-    row.appendChild(div);
+//     // Append the div element to the row element
+//     row.appendChild(div);
 
-    // Append the row element to the table element
-    table.appendChild(row);
-  }
-});
+//     // Append the row element to the table element
+//     table.appendChild(row);
+//   }
+// });
 
 
 // ----------- Welding cam button management --------------------------------
 const startWeldButton = document.getElementById('video-button-weld');
 const shootWeldButton = document.getElementById('shoot-button-weld');
 
-// Add a click event listener to the shot button and handle the response
+// Add a click event listener to the shot button and handle the response updating the image and data
 shootWeldButton.addEventListener('click', () => {
-  fetch('/shoot_welding', {
-    method: 'POST',
+  fetch('/weld_measure', {
+    method: 'GET',
   })
   .then(response => response.json())
-  .then(data => console.log(data))
+  .then(data => {
+    // console.log(data);
+    // data has 2 fields: status, lenght, img, error
+    if (data.status == 200) {
+      cam_weld_measure.innerText = data.lenght + " mm";
+      cam_weld_cod_err.innerText = data.error;
+      if (data.img != null) {
+        img_result_weld.src = 'data:image/jpeg;base64,' + data.img;
+      }
+      else {
+        img_result_weld.src = '';
+      }
+    }
+    
+    // print everithing in the console less the image
+    console.log(data.status);
+    console.log(data.lenght);
+    console.log(data.error);
+  })
   .catch((error) => {
     console.error('Error:', error);
   });
@@ -231,20 +251,20 @@ function get_cam_cola_response() {
 setInterval(get_cam_cola_response, 500);
 
 // SocketIO streaming connection
-const socket_cola = io.connect('http://' + document.domain + ':' + location.port);
+// const socket_cola = io.connect('http://' + document.domain + ':' + location.port);
 
-socket_cola.on('connect', function() {
-  console.log('Connected cam cola streaming socket');
-});
+// socket_cola.on('connect', function() {
+//   console.log('Connected cam cola streaming socket');
+// });
 
-socket_cola.on('disconnect', function() {
-  console.log('Socket cam cola conecction lost');
-});
+// socket_cola.on('disconnect', function() {
+//   console.log('Socket cam cola conecction lost');
+// });
 
-socket_cola.on('video_frame', function(data) {
-  // console.log('Received frame');
-  document.getElementById('video-stream-cola').src = 'data:image/jpeg;base64,' + data.frame;
-});
+// socket_cola.on('video_frame', function(data) {
+//   // console.log('Received frame');
+//   document.getElementById('video-stream-cola').src = 'data:image/jpeg;base64,' + data.frame;
+// });
 
 
 // ----------- Cola cam button management --------------------------------
@@ -253,11 +273,28 @@ const shootColaButton = document.getElementById('shoot-button-cola');
 
 // Add a click event listener to the shot button and handle the response
 shootColaButton.addEventListener('click', () => {
-  fetch('/shoot_cola', {
-    method: 'POST',
+  fetch('/tail_measure', {
+    method: 'GET',
   })
   .then(response => response.json())
-  .then(data => console.log(data))
+  .then(data => {
+    // console.log(data);
+    // data has 2 fields: status, lenght, img, error
+    if (data.status == 200) {
+      cam_cola_measure.innerText = data.lenght + " mm";
+      cam_cola_cod_err.innerText = data.error;
+      if (data.img != null) {
+        img_result_cola.src = 'data:image/jpeg;base64,' + data.img;
+      }
+      else {
+        img_result_cola.src = '';
+      }
+    }
+    // print everithing in the console less the image
+    console.log(data.status);
+    console.log(data.lenght);
+    console.log(data.error);
+  })
   .catch((error) => {
     console.error('Error:', error);
   });

@@ -4,6 +4,7 @@ import time
 
 class EsmerilWebApp:
     def __init__(self):
+        self.run = True
         self.prev_state = False
         self.plc_controller_right = None
         self.plc_controller_left = None
@@ -21,6 +22,7 @@ class EsmerilWebApp:
 
     def __del__(self):
         print(" ++++++++++++++++++ Terminando hilo de control de esmeril")
+        self.run = False
         if self.thread_plc is not None:
             self.thread_plc.join()
 
@@ -33,7 +35,7 @@ class EsmerilWebApp:
     def move_2drives(self, x, y, x1, y1):
         print(f" -> +++++++++ Left: {x1}, {y1} Right: {x}, {y}")
         self.plc_controller_right.move_2Axis(3, x, y)
-        self.plc_controller_left.move_2Axis(3, x1, y1)
+        # self.plc_controller_left.move_2Axis(3, x1, y1)
         while True:
             right_pos_x = round(self.plc_controller_right.ms.realPos[0], 2)
             right_pos_y = round(self.plc_controller_right.ms.realPos[1], 2)
@@ -74,7 +76,7 @@ class EsmerilWebApp:
                     print(f" -> +++++++++ Left: {left_pos_x}, {left_pos_y}")
                 time.sleep(0.1)
 
-    def distancia_coor(x1, y1, x2, y2):
+    def distancia_coor(self, x1, y1, x2, y2):
         """ x1 y y1 son las coordenadas del punto en el sistema principal
             x2 y y2 son las coordenadas del punto en el sistema trasladado
         """
@@ -91,21 +93,12 @@ class EsmerilWebApp:
         self.plc_controller_left = self.plc_parser.CtrlFMC[2]
 
         self.prev_state = False
-        while True: 
+        while self.run: 
             # print(f"Esperando trigger --------------------------------------------------------------------------{self.plc_parser.ctw_cam}")
             # # Rutina de ejecucion
-            
-            # self.move_1drive(0, 0, side="left")
-            # time.sleep(1)
-            # self.move_1drive(-20, -100, side="left")
-            # time.sleep(1)
-            
-            # self.move_1drive(0, -100, "right")
-
             if self.plc_parser.ctw_cam["TRIG_ESME"] == False:
-                self.plc_parser.stw_cam["READY"] = True
+                # self.plc_parser.stw_cam["READY"] = True
                 self.prev_state = False
-
 
             if self.plc_parser.ctw_cam["TRIG_ESME"] ^ self.prev_state:
                 # self.num_toques = self.plc_parser.ctw_plc["NUM_TOQUES"]
@@ -148,39 +141,41 @@ class EsmerilWebApp:
                     # Rutina de ejecucion con self.move_2drives
                     axis = 3
                     i = 0
-                    self.move_2drives(x_left.pop(i), y_left.pop(i), x_right.pop(i), y_right.pop(i))
-                    self.move_1drive(x_right.pop(0), y_right.pop(0), "right")
+                    # self.move_1drive(x_right.pop(0), y_right.pop(0), "right")
 
-                    for i in range(0, len(x_right), 2):
-                        for j in range(2):
-                            if i + j < len(x_right):
-                                self.move_2drives(x_left[i + j], y_left[i + j], x_right[i + j], y_right[i + j])
-                                time.sleep(0.1)
-                        time.sleep(1)
+                    # self.move_2drives(x_left.pop(i), y_left.pop(i), x_right.pop(i), y_right.pop(i))
+                    # self.move_1drive(x_right.pop(0), y_right.pop(0), "right")
 
-                    self.move_1drive(x_left[-1], y_left[-1], "left")
-                    # ---------------------------------------------------
-                    # self.plc_controller_left.move_2Axis(axis, x_left.pop(i), y_left.pop(i))
-                    # self.plc_controller_right.move_2Axis(axis, x_right.pop(i), y_right.pop(i))
-                    # time.sleep(2)
-                    # self.plc_controller_right.move_2Axis(axis, x_right.pop(0), y_right.pop(0))
-                    # time.sleep(2)
                     # for i in range(0, len(x_right), 2):
                     #     for j in range(2):
                     #         if i + j < len(x_right):
-                    #             self.plc_controller_left.move_2Axis(axis, x_left[i + j], y_left[i + j])
+                    #             self.move_2drives(x_left[i + j], y_left[i + j], x_right[i + j], y_right[i + j])
                     #             time.sleep(0.1)
-                    #             self.plc_controller_right.move_2Axis(axis, x_right[i + j], y_right[i + j])
-                    #             time.sleep(4)  
-                    #     time.sleep(2)
+                    #     time.sleep(1)
 
-                    # self.plc_controller_left.move_2Axis(axis, x_left[-1], y_left[-1])
+                    # self.move_1drive(x_left[-1], y_left[-1], "left")
+                    # ---------------------------------------------------
+                    self.plc_controller_left.move_2Axis(axis, x_left.pop(i), y_left.pop(i))
+                    self.plc_controller_right.move_2Axis(axis, x_right.pop(i), y_right.pop(i))
+                    time.sleep(2)
+                    self.plc_controller_right.move_2Axis(axis, x_right.pop(0), y_right.pop(0))
+                    time.sleep(2)
+                    for i in range(0, len(x_right), 2):
+                        for j in range(2):
+                            if i + j < len(x_right):
+                                self.plc_controller_left.move_2Axis(axis, x_left[i + j], y_left[i + j])
+                                time.sleep(0.1)
+                                self.plc_controller_right.move_2Axis(axis, x_right[i + j], y_right[i + j])
+                                time.sleep(4)  
+                        time.sleep(2)
+
+                    self.plc_controller_left.move_2Axis(axis, x_left[-1], y_left[-1])
 
                     self.plc_parser.stw_cam["BUSY"] = False
                     self.plc_parser.stw_cam["ERROR"] = False
                     
-                    # self.plc_parser.stw_cam["READY"] = True
-                self.prev_state = self.plc_parser.ctw_plc["TRIG_ESME"]
+                    self.plc_parser.stw_cam["READY"] = True
+                self.prev_state = self.plc_parser.ctw_cam["TRIG_ESME"]
         
 
 

@@ -22,8 +22,8 @@ import time
 class FMC4030:
 
     # Ruta de driver para controlador FMC4030
-    # so_file = "/home/ubuntu/maqui/fmc4030-Drive/libFMC4030-Lib.so"
-    # fmc4030 = CDLL(so_file)    
+    so_file = "/home/ubuntu/maqui/fmc4030-Drive/libFMC4030-Lib.so"
+    fmc4030 = CDLL(so_file)    
     ms = machine_status() # Instancia de estado
     
     # Número del controlador, este número de identificación es único
@@ -74,7 +74,7 @@ class FMC4030:
     
 
     def connect_Machine(self):
-        
+        conn = 0
         try:
             conn = self.fmc4030.FMC4030_Open_Device(self.id, c_char_p(bytes(self.ip, 'utf-8')), self.port)
             print(self.ip)
@@ -241,13 +241,13 @@ class FMC4030:
             # check if the machine is connected
 
 
-        #     # self.get_AxisCurrentPos(axisX)    
-        #     if (self.ms.realPos[0] > 1500) and self.AxisX_Home and not self.enable_status : 
-        #         self.set_Output(0,1)
-        #         self.enable_status = True
-        #     elif (self.ms.realPos[0] <= 1500) and self.enable_status: 
-        #         self.set_Output(0,0)
-        #         self.enable_status = False
+            # self.get_AxisCurrentPos(axisX)    
+            # if (self.ms.realPos[0] > 1500) and self.AxisX_Home and not self.enable_status : 
+            #     self.set_Output(0,1)
+            #     self.enable_status = True
+            # elif (self.ms.realPos[0] <= 1500) and self.enable_status: 
+            #     self.set_Output(0,0)
+            #     self.enable_status = False
           
                 
         

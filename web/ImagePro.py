@@ -21,7 +21,7 @@ def measure_welding(img):
         err = 1
         return img, 0, 0, 0, err
     # Cut, resize layer
-    x1, y1, x2, y2 = 830, 500, 1030, 700
+    x1, y1, x2, y2 = 830, 500, 1000, 700
     img = img[y1:y2, x1:x2]
     img = cv2.resize(img, (800, 750), interpolation=cv2.INTER_AREA)
     # Gray mask layer
@@ -72,14 +72,14 @@ def measure_welding(img):
     dx1 = obj[0][2]
     dx2 = obj[1][2]
     dist = o2 - o1
-    dist_mm = round(0.0245924 * dist + 1.03627584, 2)
+    dist_mm = round(0.02396728 * dist - 0.00643388, 2)
 
     if obj[0][2] * obj[0][3] < 7000 or obj[1][2] * obj[1][3] < 7000:
         print("Low accuracy 3")
         return img_ori, 0, 0, 0, 3
     
     
-    if obj[0][0] + dist + obj[1][2]> img_w:
+    if obj[0][2] + dist + obj[1][2]> img_w:
         print("Low accuracy 4")
         return img_ori, 0, 0, 0, 3
 
@@ -134,12 +134,12 @@ def measure_tail(img):
         return img, 0, err
 
     # Capa  de corte: extraccion de area de interes950:1050
-    img = img[310:560, 300:1400]   
+    img = img[610:750, 230:1250]   
     img = cv2.resize(img, (0, 0), fx=1, fy=3)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Extract wire region
-    _ , thresh = cv2.threshold(gray,70,250,cv2.THRESH_BINARY_INV)
+    _ , thresh = cv2.threshold(gray,80,100,cv2.THRESH_BINARY_INV)
     
     # morphology kernel
     kernel = np.array((
@@ -155,8 +155,8 @@ def measure_tail(img):
 
     _, mid = cv2.threshold(dy, 0.2 * 255, 255, cv2.THRESH_BINARY)
     
-    mid[0:250, :] = 0
-    mid[550:, :] = 0
+    mid[0:50, :] = 0
+    # mid[780:, :] = 0
 
     mid_temp = cv2.dilate(mid, kernel, iterations=7)
     mid = cv2.erode(mid_temp, kernel, iterations=7)
@@ -172,21 +172,25 @@ def measure_tail(img):
     x, y, w, h = cv2.boundingRect(best_mid)
     cv2.rectangle(img_contour, (x, y), (x+w, y+h), (255, 0, 255), 2)
     # draw a vertical line given a x position
-    x_line = 1075
+    x_line = 35
+    x_sup = 980
+
     cv2.line(img_contour, (x_line, 0), (x_line, img.shape[0]), (0, 255, 0), 2)
-    pixel_length = x_line - x
+    cv2.line(img_contour, (x_sup, 0), (x_sup, img.shape[0]), (0, 255, 0), 2)
+
+    pixel_length = x + w - x_line
 
     # check if x is out of range
-    if x > 1000:
+    if x + w > x_sup:
         err = 2
         return img_contour, -1, err
-    elif x + w < 1000:
+    elif x + w < x_line:
         err = 3
         return img_contour, -1, err
 
     # tail_length = 0.05699 * pixel_length - 2.947
-    tail_length = 0.03837315 * pixel_length +  0.43820662
-    tail_length = tail_length * 10
+    tail_length = 0.31662316 * pixel_length - 0.6894023
+    # tail_length = tail_length #* 10 # cm
     tail_length = round(tail_length, 1)
 
     # put pixel length on image

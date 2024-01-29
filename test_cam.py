@@ -3,28 +3,32 @@ import cv2
 import numpy as np
 import base64
 import time
+from web.ptz_app import PTZCamera
 
-cap = cv2.VideoCapture(0)
-cap1 = cv2.VideoCapture(0)
+# cam1 = PTZCamera("192.168.90.109", "admin", "Bertek@2060")
+cam1 = PTZCamera("192.168.90.108", "admin", "Bertek@206036")
+
+# connect
+# cam1.connect()
+# cam2.connect()
+
+# start video capture
+cam1.start_video_capture()
+# cam2.start_video_capture()
 
 while True:
-    ret, frame = cap.read()
-    if ret:
-        frame = cv2.resize(frame, (640, 480))
-        frame = cv2.flip(frame, 1)
-        frame_base64 = base64.b64encode(frame).decode('utf-8')
-        cv2.imshow('frame', frame)
-
-    ret1, frame1 = cap1.read()
-    if ret1:
-        frame1 = cv2.resize(frame1, (640, 480))
-        frame1 = cv2.flip(frame1, 1)
-        frame_base64_1 = base64.b64encode(frame1).decode('utf-8')
-        cv2.imshow('frame1', frame1)
-
+    # read and show cam 1
+    frame1 = cam1.video_capture.read()[1]
+    # cv2.imshow("cam1", frame1)
+    # read and show cam 2
+    # frame2 = cam2.video_capture.read()[1]
+    # cv2.imshow("cam2", frame2)
+    
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-    time.sleep(0.1) 
+    time.sleep(0.1)
 
-cap.release()
 cv2.destroyAllWindows()
+
+
+

@@ -231,9 +231,7 @@ class PLCDataParser(HTTPDataSender):
         word_cam = bin(word_cam)[2:].zfill(16)
         for parCAM, i in zip(self.ctw_cam, range(16)):
             self.ctw_cam[parCAM] = True if word_cam[i] == '1' else False
-
-        
-    
+   
     def set_fmc_values(self, offset):
         # Parse values FMC -> PLC
         util.set_bool(self.data_status, offset, 0, self.data_struc["SYSTEM"]["LINK"])
@@ -396,6 +394,15 @@ class PLCDataParser(HTTPDataSender):
             axis_addr =[[0, 0], [26, 112], [52, 224], [78, 336]]
             
             start_time_total = time.perf_counter()
+
+            # Verify plc connection
+            if self.plc.get_connected() == False:
+                self.connect_plc()
+                # print
+                print("Reconnecting PLC: ", self.id, self.plc_ip)
+                continue
+
+
             self.get_plc_data()
         
             for x in range(4):
