@@ -7,60 +7,49 @@ import numpy as np
 # - Obstacle machine area free detector
 
 def measure_welding(img):
-    """ Esta funcion recibe imagenes de 1080x1920, detecta los bordes de las barras de acero y mide la distancia entre ellas.
-        - Codigos de error:
-            0: No hay error
-            1: Imagen en formato incorrecto
-            2: Fallo en la deteccion de bordes
-            3: mala deteccion
-    """
-    err = 0
-    # Check image size and rgb chanel
-    if img.shape != (1080, 1920, 3):
-        print("Image size error")
-        err = 1
-        return img, 0, 0, 0, err
     # Cut, resize layer
-    x1, y1, x2, y2 = 830, 500, 1000, 700
+    x1, y1, x2, y2 = 820, 450, 995, 700
     img = img[y1:y2, x1:x2]
-    img = cv2.resize(img, (800, 750), interpolation=cv2.INTER_AREA)
+    img = cv2.resize(img, (0, 0), fx=3, fy=1)
+    img_h, img_w, _ = img.shape
+
     # Gray mask layer
-    img_ori = img.copy()
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img_h, img_w = img.shape
-    # print(img_h, img_w)
-    # Blur layer
-    img_blur = cv2.medianBlur(img, 17)
-    # Sobel mask
-    sobelx = cv2.Sobel(src=img_blur, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=9) # Sobel Edge Detection on the X axis
-    sobely = cv2.Sobel(src=img_blur, ddepth=cv2.CV_64F, dx=0, dy=1, ksize=9) # Sobel Edge Detection on the Y axis
-    # False edge detector -> No apply in this case
-    edge_map = np.hypot(sobelx, sobely)
-    edge_map = edge_map / edge_map.max() * 255
-    # Canny detector aplication
-    edges = cv2.Canny(image=np.uint8(edge_map), threshold1=85, threshold2=450)
-    # Morphological closing operation to close the borders of the detected edges
-    kernel_size = 5
-    kernel = np.ones((kernel_size, kernel_size), np.uint8)
-    closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Extract wire region
+    _ , thresh = cv2.threshold(gray,80,100,cv2.THRESH_BINARY_INV)
+    # morphology kernel
+    kernel = np.array((
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1]
+        ), dtype="int")
+
+    # Aplicar Sobel para detectar bordes horizontales y verticales
+    dy = cv2.Sobel(thresh, cv2.CV_32F, 0, 1, ksize=21)
+    dy = dy * dy
+    cv2.normalize(dy, dy, norm_type=cv2.NORM_MINMAX, alpha=255)
+    dy = dy.astype(np.uint8)
+    _, mid = cv2.threshold(dy, 0.5 * 255, 255, cv2.THRESH_BINARY)
+    mid_temp = cv2.dilate(mid, kernel, iterations=13)
+    mid = cv2.erode(mid_temp, kernel, iterations=13)
+
+    # get x position of the center of the image
+    center_x = img.shape[1] / 2
+    # Encontrar los contornos en la imagen
+    mid_blobs, _ = cv2.findContours(mid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    best_mid_left, best_mid_right = get_best_blob(mid_blobs, center_x)
+
     # Get contours
-    contours, _ = cv2.findContours(closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = [best_mid_right, best_mid_left]
     rects = [(x, y, w, h) for contour in contours for x, y, w, h in [cv2.boundingRect(contour)]]
     obj = sorted(rects, key=lambda x: x[2]*x[3], reverse=True)[:2]
-    
-    for rect in rects:
-        x, y, w, h = rect
-        if rect in obj:
-            cv2.rectangle(img_ori, (x, y), (x+w, y+h), (255, 0, 255), 2)
-    # print(obj)
-    
-    if len(obj) != 2:  
-        print("Low accuracy")
-        err = 2
-        return img_ori, 0, 0, 0, err
 
+    # print(obj)
+    if len(obj) != 2:
+        print("Low accuracy 2")
+        return img_ori, None, None, None
     
-    # Sort the objects
+    # Sort the objects by position
     if obj[0][0] < obj[1][0]:
         o1 = obj[0][0] + obj[0][2]
         o2 = obj[1][0]
@@ -73,19 +62,22 @@ def measure_welding(img):
     dx2 = obj[1][2]
     dist = o2 - o1
     dist_mm = round(0.02396728 * dist - 0.00643388, 2)
-
+    
+    for rect in rects:
+        x, y, w, h = rect
+        if rect in obj:
+            cv2.rectangle(img_ori, (x, y), (x+w, y+h), (255, 0, 255), 2)
+    
+    
     if obj[0][2] * obj[0][3] < 7000 or obj[1][2] * obj[1][3] < 7000:
         print("Low accuracy 3")
-        return img_ori, 0, 0, 0, 3
+        return img_ori, None, None, None
     
     
-    if obj[0][2] + dist + obj[1][2]> img_w:
-        print("Low accuracy 4")
-        return img_ori, 0, 0, 0, 3
-
-    # if dx1 + dx2 > img_w:
-    #     print("Low accuracy 5")
-    #     return img_ori, 0, 0, 3
+    if obj[0][2] + dist + obj[1][2] > img_w:
+        print("Low accuracy 4:", end=" ")
+        print(f"{obj[0][0]} + {dist} + {obj[1][2]} > {img_w}")
+        return img_ori, None, None, None
 
     color1 = (255, 255, 0)
     color2 = (0, 255, 0)
@@ -96,16 +88,44 @@ def measure_welding(img):
     # Draw arrows
     img_ori = cv2.arrowedLine(img_ori, (0, int(img_h/2) - 20), (int(o1), int(img_h/2) - 20), color=color1, thickness=1)
     img_ori = cv2.arrowedLine(img_ori, (int(img_w), int(img_h/2) - 20), (int(o2), int(img_h/2) - 20), color=color2, thickness=1)        
-    
+
     # Text
-    t1 = f'dx1: {dx1}'
-    t2 = f'dx2: {dx2}'
-    t3 = f'Dist: {dist_mm} mm, {dist} px'
+    t1 = f'dx1: {dx1} , {obj[0][3]}'
+    t2 = f'dx2: {dx2}, {obj[1][3]}'
+    t3 = f'Dist: {dist_mm} mm - Pix: {dist}'
     img_ori = cv2.putText(img_ori, t1, (int(img_w/4), int(img_h/2) + 20), font, 0.4, color1, 1, cv2.LINE_AA)
     img_ori = cv2.putText(img_ori, t2, (int(3*img_w/5), int(img_h/2) + 20), font, 0.4, color2, 1, cv2.LINE_AA)
     img_ori = cv2.putText(img_ori, t3, (int(img_w/2) + 30, int(img_h/2) - 40), font, 0.4, (255,0, 255), 1, cv2.LINE_AA)
     
-    return img_ori, dist_mm, dx1, dx2, err
+    return img_ori, dist_mm, dx1, dx2
+
+def get_best_weld_blob(blobs, center_x):
+    if blobs and len(blobs) >= 2:
+        # Dividir los blobs en dos grupos: izquierda y derecha
+        left_blobs = []
+        right_blobs = []
+        for blob in blobs:
+            x, y, w, h = cv2.boundingRect(blob)  # Obtener el rectángulo delimitador
+            center = x + w / 2  # Calcular el centro geométrico
+            if center < center_x:
+                left_blobs.append(blob)
+            else:
+                right_blobs.append(blob)
+        
+        # Calcular el área de cada blob en el grupo de la izquierda y obtener el más grande
+        left_areas = [cv2.contourArea(blob) for blob in left_blobs]
+        biggest_left_blob = left_blobs[np.argmax(left_areas)] if left_blobs else None
+
+        # Calcular el área de cada blob en el grupo de la derecha y obtener el más grande
+        right_areas = [cv2.contourArea(blob) for blob in right_blobs]
+        biggest_right_blob = right_blobs[np.argmax(right_areas)] if right_blobs else None
+
+        # Devolver el blob más grande de cada lado
+        return biggest_left_blob, biggest_right_blob
+    else:
+        # Si no hay suficientes contornos, devolver None
+        return None, None
+    
     
 def get_best_blob(blobs):
     if blobs:
