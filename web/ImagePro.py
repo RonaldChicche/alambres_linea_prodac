@@ -12,6 +12,7 @@ def measure_welding(img):
     img = img[y1:y2, x1:x2]
     img = cv2.resize(img, (0, 0), fx=3, fy=1)
     img_h, img_w, _ = img.shape
+    img_ori = img.copy()
 
     # Gray mask layer
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
