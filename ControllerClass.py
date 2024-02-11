@@ -183,6 +183,36 @@ class FMC4030:
         self.Axis_RealPos[int(Axis.value)] = int(round(currentPos.value))
         # print("Call Current Pos: {}".format(self.Axis_Comm_Status[int(Axis.value)]))
         time.sleep(0.03)
+
+    # ----------------------------------------------------- Get All Axis Position
+    def get_AxisCurrentPosAll(self):
+        """Get the current position of all axis
+        Returns:
+            tuple: (X, Y, Z)"""
+        currentPos = (c_float * 3)()
+        self.fmc4030.FMC4030_Get_Axis_Current_Pos_All(self.id, pointer(currentPos))
+        print("Current Pos: ", currentPos[0], currentPos[1], currentPos[2])
+        
+        time.sleep(0.03)
+        return currentPos[0], currentPos[1], currentPos[2]
+    
+    def get_AxisXYCurrentPos(self):
+        currentPos = (c_float * 2)()
+        self.Axis_Comm_Status[int(axisX.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axisX, pointer(currentPos[0]))
+        self.Axis_Comm_Status[int(axisY.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axisY, pointer(currentPos[1]))
+        currentPos = (int(round(currentPos[0])), int(round(currentPos[1])))
+        print("Current Pos: ", currentPos)
+        time.sleep(0.03)
+        return currentPos
+    
+    # Function to get home status of all axis
+    def get_AxisHomeStatus(self):
+        homeStatus = (c_int32 * 3)()
+        self.fmc4030.FMC4030_Get_Axis_Home_Status(self.id, pointer(homeStatus))
+        print("Home Status: ", homeStatus[0], homeStatus[1], homeStatus[2])
+        time.sleep(0.03)
+        return homeStatus[0], homeStatus[1], homeStatus[2]
+    # -----------------------------------------------------
     
     def get_AxisCurrentSpeed(self, Axis=axisX):
         currentSpeed = c_float(0.0)
