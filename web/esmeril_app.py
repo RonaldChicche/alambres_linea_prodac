@@ -153,9 +153,9 @@ class EsmerilWebApp:
                                                                             self.radio_exterior, 6, 
                                                                             (-179, -177 + 2), (-202-3, -164 + 2))
                 # verify if setpoints do not exceed the limits
-                for i in range(len(x_right)):
-                    if self.distancia_coor(x_right[i], y_right[i], x_left[i], y_left[i]) < 203:
-                        error = 4
+                # for i in range(len(x_right)):
+                #     if self.distancia_coor(x_right[i], y_right[i], x_left[i], y_left[i]) < 203:
+                #         error = 4
 
                 # # verify if drives are home -----------------------------
                 # if self.plc_controller_right.get_AxisHomeStatus(3) == 0 or self.plc_controller_left.get_AxisHomeStatus(3) == 0:
