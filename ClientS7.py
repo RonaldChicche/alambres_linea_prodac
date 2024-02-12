@@ -421,10 +421,10 @@ class PLCDataParser(HTTPDataSender):
                         thread.start()
 
                         # Wait for 2 seconds or until the thread finishes, whichever comes first
-                        thread.join(timeout=2)
+                        thread.join(timeout=4)
 
                         if thread.is_alive():
-                            print("Timeout Connection: ", self.id)
+                            print("-> Timeout Check from ClientS7 - Connection: ", self.id)
                         
                         continue 
                                         
