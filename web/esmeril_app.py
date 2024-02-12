@@ -149,6 +149,7 @@ class EsmerilWebApp:
                 print(f" ++++++++++++++++++ Iniciando rutina de control de esmeril: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
                 
                 self.plc_parser.stw_cam["READY"] = False
+                error = 0
                 x_right, y_right, x_left, y_left = self.generar_trayectoria(self.diametro_interior/2, 
                                                                             self.radio_exterior, 6, 
                                                                             (-179, -177 + 2), (-202-3, -164 + 2))
