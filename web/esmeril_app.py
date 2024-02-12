@@ -142,6 +142,9 @@ class EsmerilWebApp:
                 # self.plc_parser.stw_cam["READY"] = True
                 self.prev_state = False
 
+            # print axisXY pos from left
+            print(self.plc_controller_left.get_AxisXYCurrentPos())
+
             if self.plc_parser.ctw_cam["TRIG_ESME"] ^ self.prev_state:
                 if self.prev_state == True:
                     continue
