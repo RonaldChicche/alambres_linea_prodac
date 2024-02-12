@@ -63,14 +63,14 @@ class FMC4030:
         self.ip = ipAddr
         self.port = port
         self.connected = self.connect_Machine()
-        self.listening_thread = threading.Thread(target=self.listening)
-        self.listening_thread.daemon = True
-        self.listening_thread.start()
+        #self.listening_thread = threading.Thread(target=self.listening)
+        #self.listening_thread.daemon = True
+        #self.listening_thread.start()
         
 
     def __del__(self):
         self.disconnect_Machine()
-        self.listening_thread.join()
+        #self.listening_thread.join()
     
 
     def connect_Machine(self):

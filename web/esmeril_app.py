@@ -123,8 +123,7 @@ class EsmerilWebApp:
         # calculo de la distancia
         return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-    def plc_control(self):
-        
+    def plc_control(self):        
         # # Test
         self.plc_controller_right = self.plc_parser.CtrlFMC[3]
         self.plc_controller_left = self.plc_parser.CtrlFMC[2]
@@ -133,9 +132,12 @@ class EsmerilWebApp:
         while self.run: 
             # print(f"Esperando trigger --------------------------------------------------------------------------{self.plc_parser.ctw_cam}")
             # # Rutina de ejecucion
+            #print(f"Left pos: {self.plc_controller_left.get_AxisCurrentPos(self.plc_controller_left.axisY)}")
             if self.plc_parser.ctw_cam["TRIG_ESME"] == False:
                 # self.plc_parser.stw_cam["READY"] = True
                 self.prev_state = False
+                # print(f" ++++++++++++++++++ Reiniciando bit: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
+
 
             # print axisXY pos from left
             # print(self.plc_controller_left.get_AxisXYCurrentPos())
@@ -143,11 +145,13 @@ class EsmerilWebApp:
             if self.plc_parser.ctw_cam["TRIG_ESME"] ^ self.prev_state:
                 if self.prev_state == True:
                     continue
+
+                print(f" ++++++++++++++++++ Iniciando rutina de control de esmeril: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
                 
                 self.plc_parser.stw_cam["READY"] = False
                 x_right, y_right, x_left, y_left = self.generar_trayectoria(self.diametro_interior/2, 
                                                                             self.radio_exterior, 6, 
-                                                                            (-179, -177+2), (202 -3, -164 + 2))
+                                                                            (-179, -177 + 2), (-202-3, -164 + 2))
                 # verify if setpoints do not exceed the limits
                 for i in range(len(x_right)):
                     if self.distancia_coor(x_right[i], y_right[i], x_left[i], y_left[i]) < 203:
@@ -197,7 +201,7 @@ class EsmerilWebApp:
                         self.move_1drive(x_left[i + 1], y_left[i + 1], "left")
                         time.sleep(0.2)
                         self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
-
+                        
                     self.plc_controller_right.abs_Move(AxePos=-50)
                     self.plc_controller_left.abs_Move(AxePos=-50)
 
@@ -206,7 +210,9 @@ class EsmerilWebApp:
                     
                     self.plc_parser.stw_cam["READY"] = True
                 self.prev_state = self.plc_parser.ctw_cam["TRIG_ESME"]
+                print(f" ++++++++++++++++++ Terminando rutina de control de esmeril: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
         
+
 
     def generar_trayectoria(self, radio:float, radio_esmeril:float, num_lados:int, right_center:tuple, left_center:tuple):
         """ Genera una trayectoria de un poligono regular con circunferencia inscrita

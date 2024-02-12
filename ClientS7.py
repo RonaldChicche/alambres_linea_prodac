@@ -395,66 +395,69 @@ class PLCDataParser(HTTPDataSender):
             
             start_time_total = time.perf_counter()
 
-            # Verify plc connection
-            if self.plc.get_connected() == False:
-                self.connect_plc()
-                # print
-                print("Reconnecting PLC: ", self.id, self.plc_ip)
-                continue
-
-
-            self.get_plc_data()
+            try:    
+                # Verify plc connection
+                if self.plc.get_connected() == False:
+                    self.connect_plc()
+                    # print
+                    print("Reconnecting PLC: ", self.id, self.plc_ip)
+                    continue
+                self.get_plc_data()
         
-            for x in range(4):
-                start_time = time.perf_counter()
-                self.id = x
+                for x in range(4):
+                    start_time = time.perf_counter()
+                    self.id = x
 
-                # Verify conection and status
-                
-                st = self.CtrlFMC[self.id].get_Status()
-                if st == -1:
-                    req_stat = [None]  # Mutable var so the function can store the result
-                    def func():
-                        req_stat[0] = self.CtrlFMC[self.id].disconnect_Machine()
-                        req_stat[0] = self.CtrlFMC[self.id].connect_Machine()
+                    # Verify conection and status
+                    
+                    st = self.CtrlFMC[self.id].get_Status()
+                    if st == -1:
+                        req_stat = [None]  # Mutable var so the function can store the result
+                        def func():
+                            req_stat[0] = self.CtrlFMC[self.id].disconnect_Machine()
+                            req_stat[0] = self.CtrlFMC[self.id].connect_Machine()
 
-                    thread = threading.Thread(target=func)
-                    thread.start()
+                        thread = threading.Thread(target=func)
+                        thread.start()
 
-                    # Wait for 2 seconds or until the thread finishes, whichever comes first
-                    thread.join(timeout=2)
+                        # Wait for 2 seconds or until the thread finishes, whichever comes first
+                        thread.join(timeout=2)
 
-                    if thread.is_alive():
-                        print("Timeout Connection: ", self.id)
+                        if thread.is_alive():
+                            print("Timeout Connection: ", self.id)
+                        
+                        continue 
+                                        
+                    if x == 0:
+                        if self.CtrlFMC[self.id].Axis_RealPos[0] >= 1500:
+                            self.CtrlFMC[self.id].set_Output(0,1)
+                        else: self.CtrlFMC[self.id].set_Output(0,0)
+                        
+                        if self.CtrlFMC[self.id].Axis_RealPos[0] >= 2200:
+                            self.CtrlFMC[self.id].set_Output(1,1)
+                        else: self.CtrlFMC[self.id].set_Output(1,0)
+                        
+                        if self.CtrlFMC[self.id].Axis_RealPos[1] >= 2215 or self.CtrlFMC[self.id].Axis_RealPos[1] <= 1510:
+                                self.CtrlFMC[self.id].set_Output(2,1)
+                        else: self.CtrlFMC[self.id].set_Output(2,0)
+                        
+                        if self.CtrlFMC[self.id].Axis_RealPos[2] >= 1950:
+                                self.CtrlFMC[self.id].set_Output(3,1)
+                        else: self.CtrlFMC[self.id].set_Output(3,0)
                     
-                    continue 
-                                    
-                if x == 0:
-                    if self.CtrlFMC[self.id].Axis_RealPos[0] >= 1500:
-                        self.CtrlFMC[self.id].set_Output(0,1)
-                    else: self.CtrlFMC[self.id].set_Output(0,0)
-                    
-                    if self.CtrlFMC[self.id].Axis_RealPos[0] >= 2200:
-                        self.CtrlFMC[self.id].set_Output(1,1)
-                    else: self.CtrlFMC[self.id].set_Output(1,0)
-                    
-                    if self.CtrlFMC[self.id].Axis_RealPos[1] >= 2215 or self.CtrlFMC[self.id].Axis_RealPos[1] <= 1510:
-                            self.CtrlFMC[self.id].set_Output(2,1)
-                    else: self.CtrlFMC[self.id].set_Output(2,0)
-                    
-                    if self.CtrlFMC[self.id].Axis_RealPos[2] >= 1950:
-                            self.CtrlFMC[self.id].set_Output(3,1)
-                    else: self.CtrlFMC[self.id].set_Output(3,0)
-                
-                     
-                self.FMC_S7(self.CtrlFMC[self.id], axis_addr[x][0], axis_addr[x][1])
-                # self.CtrlFMC[self.id].disconnect_Machine()
-    
-                end_time = time.perf_counter()
-                # print(end_time - start_time, self.id, "seconds FMC")
-            self.set_plc_data()
-            end_time_total = time.perf_counter()
-            # print(end_time_total - start_time_total, self.id, "seconds FMC")    
+                        
+                    self.FMC_S7(self.CtrlFMC[self.id], axis_addr[x][0], axis_addr[x][1])
+                    # self.CtrlFMC[self.id].disconnect_Machine()
+        
+                    end_time = time.perf_counter()
+                    # print(end_time - start_time, self.id, "seconds FMC")
+                self.set_plc_data()
+                end_time_total = time.perf_counter()
+                # print(end_time_total - start_time_total, self.id, "seconds FMC") 
+            except RuntimeError as e:
+                print("Runtime Error: ", e)
+                self.disconnect_plc()
+                continue
        
     
     def proc_fmc(self):
