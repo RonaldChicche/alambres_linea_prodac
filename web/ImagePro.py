@@ -9,9 +9,9 @@ import numpy as np
 def measure_welding(img):
     err = 0
     # Cut, resize layer
-    x1, y1, x2, y2 = 830, 450, 1000, 700
+    x1, y1, x2, y2 = 965, 470, 1180, 750
     img = img[y1:y2, x1:x2]
-    img = cv2.resize(img, (0, 0), fx=3, fy=1)
+    img = cv2.resize(img, (0, 0), fx=4, fy=1)
     img_h, img_w, _ = img.shape
     img_ori = img.copy()
 
@@ -46,9 +46,11 @@ def measure_welding(img):
         return img_ori, None, None, None, err
 
     # Get contours
-    contours = [best_mid_right, best_mid_left]
-    rects = [(x, y, w, h) for contour in contours for x, y, w, h in [cv2.boundingRect(contour)]]
-    obj = sorted(rects, key=lambda x: x[2]*x[3], reverse=True)[:2]
+    contours = [best_mid_left, best_mid_right]
+    
+    obj = [(x, y, w, h) for contour in contours for x, y, w, h in [cv2.boundingRect(contour)]]
+    rects = obj
+    # obj = sorted(rects, key=lambda x: x[2]*x[3], reverse=True)[:2]
 
     # print(obj)
     if len(obj) != 2:
@@ -68,7 +70,8 @@ def measure_welding(img):
     dx1 = obj[0][2]
     dx2 = obj[1][2]
     dist = o2 - o1
-    dist_mm = round(0.03485493 * dist - 0.3164318, 2)
+    # 0.018340276018071585 * x + 0.33740196290504976
+    dist_mm = round(0.018340276018071585 * dist + 0.33740196290504976, 2)
     
     for rect in rects:
         x, y, w, h = rect
@@ -85,10 +88,10 @@ def measure_welding(img):
     # take the one on the left and compare their x position to the 25% of the wide
     no_left = False
     no_right = False
-    if obj[0][0] > img_w / 4 or obj[0][2] < 10:
+    if obj[0][0] > img_w / 4:
         no_left = True
     # take the one on the right and compare the sum of its x and w to the 75% of the wide
-    if obj[1][0] + obj[1][2] < 3 * img_w / 4 or obj[1][2] < 10:
+    if obj[1][0] + obj[1][2] < 3 * img_w / 4:
         no_right = True
     
     if no_right and no_right:
@@ -127,7 +130,7 @@ def measure_welding(img):
     t3 = f'Dist: {dist_mm} mm - Pix: {dist}'
     img_ori = cv2.putText(img_ori, t1, (int(img_w/4), int(img_h/2) + 20), font, 0.4, color1, 1, cv2.LINE_AA)
     img_ori = cv2.putText(img_ori, t2, (int(3*img_w/5), int(img_h/2) + 20), font, 0.4, color2, 1, cv2.LINE_AA)
-    img_ori = cv2.putText(img_ori, t3, (int(img_w/2) + 30, int(img_h/2) - 40), font, 0.4, (255,0, 255), 1, cv2.LINE_AA)
+    img_ori = cv2.putText(img_ori, t3, (int(img_w/2) + 30, int(img_h/2) - 50), font, 0.4, (255,0, 255), 1, cv2.LINE_AA)
     
     return img_ori, dist_mm, dx1, dx2, err
 
@@ -151,6 +154,11 @@ def get_best_weld_blob(blobs, center_x):
         # Calcular el área de cada blob en el grupo de la derecha y obtener el más grande
         right_areas = [cv2.contourArea(blob) for blob in right_blobs]
         biggest_right_blob = right_blobs[np.argmax(right_areas)] if right_blobs else None
+
+        # print location from both
+        if biggest_left_blob is not None and biggest_right_blob is not None:
+            x, y, w, h = cv2.boundingRect(biggest_left_blob)
+            x, y, w, h = cv2.boundingRect(biggest_right_blob)
 
         # Devolver el blob más grande de cada lado
         return biggest_left_blob, biggest_right_blob
