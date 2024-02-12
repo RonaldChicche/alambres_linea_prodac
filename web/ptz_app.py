@@ -274,7 +274,9 @@ class CameraWelding(PTZCamera):
                 self.plc_parser.cam_struc["ERROR"] = 0
                 self.prev_state = False
 
-            if self.plc_parser.ctw_cam['TRIG_WELD'] ^ self.prev_state:    
+            if self.plc_parser.ctw_cam['TRIG_WELD'] ^ self.prev_state:  
+                if self.prev_state == True:
+                    continue  
                 self.cap = cv2.VideoCapture(self.url)
                 self.response['connected'] = self.cap.isOpened()
                 # Error de conexion
@@ -520,13 +522,14 @@ class CameraWelding(PTZCamera):
             if not self.cap.isOpened():
                 return {'status': 500, 'error': 1}
             
-            lenght_tail, error, img_res = self.measure_border()
+            lenght_weld, error, img_res = self.measure_border()
             # Process image cap for web
             img_res = cv2.imencode('.jpg', img_res)[1].tobytes()
             img_res = base64.b64encode(img_res).decode('utf-8')
             self.imagen_resultado = img_res
+            print(f"Status: {200}, lenght: {lenght_weld}, error:{error}")
             
-            return {'status': 200, 'lenght': lenght_tail, 'img': img_res, 'error': error}
+            return {'status': 200, 'lenght': lenght_weld, 'img': img_res, 'error': error}
             
             
 
@@ -581,6 +584,8 @@ class CameraTail(PTZCamera):
                 self.prev_state = False
 
             if self.plc_parser.ctw_cam["TRIG_TAIL"] ^ self.prev_state:
+                if self.prev_state == True:
+                    continue
                 self.cap = cv2.VideoCapture(self.url)
                 # Error de conexion
                 if not self.cap.isOpened():
@@ -744,4 +749,6 @@ class CameraTail(PTZCamera):
             img_res = cv2.imencode('.jpg', img_res)[1].tobytes()
             img_res = base64.b64encode(img_res).decode('utf-8')
             self.imagen_resultado = img_res
+            
+            print(f"Status: {200}, lenght: {lenght_tail}, error:{error}")
             return {'status': 200, 'lenght': lenght_tail, 'img': img_res, 'error': error}

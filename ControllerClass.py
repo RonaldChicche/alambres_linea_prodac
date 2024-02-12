@@ -63,14 +63,14 @@ class FMC4030:
         self.ip = ipAddr
         self.port = port
         self.connected = self.connect_Machine()
-        self.listening_thread = threading.Thread(target=self.listening)
-        self.listening_thread.daemon = True
-        self.listening_thread.start()
+        #self.listening_thread = threading.Thread(target=self.listening)
+        #self.listening_thread.daemon = True
+        #self.listening_thread.start()
         
 
     def __del__(self):
         self.disconnect_Machine()
-        self.listening_thread.join()
+        #self.listening_thread.join()
     
 
     def connect_Machine(self):
@@ -183,6 +183,22 @@ class FMC4030:
         self.Axis_RealPos[int(Axis.value)] = int(round(currentPos.value))
         # print("Call Current Pos: {}".format(self.Axis_Comm_Status[int(Axis.value)]))
         time.sleep(0.03)
+        return currentPos.value
+
+    def get_XYCurrentPos(self, AxisX=axisX, AxisY=axisY):
+        currentPosX = c_floatX(0.0)
+        self.Axis_Comm_Status[int(AxisX.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, Axis, pointer(currentPos))
+        self.Axis_RealPos[int(Axis.value)] = int(round(currentPos.value))
+        # print("Call Current Pos: {}".format(self.Axis_Comm_Status[int(Axis.value)]))
+        time.sleep(0.03)
+        currentPos = c_float(0.0)
+        self.Axis_Comm_Status[int(Axis.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, Axis, pointer(currentPos))
+        self.Axis_RealPos[int(Axis.value)] = int(round(currentPos.value))
+        # print("Call Current Pos: {}".format(self.Axis_Comm_Status[int(Axis.value)]))
+        time.sleep(0.03)
+        
+        return currentPos.value
+
     
     def get_AxisCurrentSpeed(self, Axis=axisX):
         currentSpeed = c_float(0.0)
