@@ -9,9 +9,9 @@ import numpy as np
 def measure_welding(img):
     err = 0
     # Cut, resize layer
-    x1, y1, x2, y2 = 830, 450, 1000, 700
+    x1, y1, x2, y2 = 965, 470, 1180, 750
     img = img[y1:y2, x1:x2]
-    img = cv2.resize(img, (0, 0), fx=3, fy=1)
+    img = cv2.resize(img, (0, 0), fx=4, fy=1)
     img_h, img_w, _ = img.shape
     img_ori = img.copy()
 
@@ -46,9 +46,9 @@ def measure_welding(img):
         return img_ori, None, None, None, err
 
     # Get contours
-    contours = [best_mid_right, best_mid_left]
-    rects = [(x, y, w, h) for contour in contours for x, y, w, h in [cv2.boundingRect(contour)]]
-    obj = sorted(rects, key=lambda x: x[2]*x[3], reverse=True)[:2]
+    contours = [best_mid_left, best_mid_right]
+    obj = [(x, y, w, h) for contour in contours for x, y, w, h in [cv2.boundingRect(contour)]]
+    rects = obj
 
     # print(obj)
     if len(obj) != 2:
@@ -68,7 +68,7 @@ def measure_welding(img):
     dx1 = obj[0][2]
     dx2 = obj[1][2]
     dist = o2 - o1
-    dist_mm = round(0.03485493 * dist - 0.3164318, 2)
+    dist_mm = round(0.018340276018071585 * dist + 0.33740196290504976, 2)
     
     for rect in rects:
         x, y, w, h = rect
