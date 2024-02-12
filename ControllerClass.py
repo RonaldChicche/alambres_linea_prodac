@@ -203,7 +203,7 @@ class FMC4030:
         axis_Y = c_int(1)
         self.Axis_Comm_Status[int(axis_X.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axis_X, pointer(currentPosX))
         self.Axis_Comm_Status[int(axis_Y.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axis_Y, pointer(currentPosY))
-        currentPos = (int(round(currentPos[0])), int(round(currentPos[1])))
+        currentPos = (int(currentPosX.value), int(currentPosY.value))
         print("Current Pos: ", currentPos)
         time.sleep(0.03)
         return currentPos
