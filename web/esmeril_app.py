@@ -41,7 +41,7 @@ class EsmerilWebApp:
         self.plc_controller_left.move_2Axis(3, x1, y1)
         while True:
             # check if has passed 10 seconds
-            if time.time() - start_time > 10:
+            if time.time() - start_time > 15:
                 print(" ++++++++++++++++++ Stop Process: Tiempo de ejecucion excedido")
                 self.plc_controller_right.stop()
                 self.plc_controller_left.stop()
@@ -143,7 +143,7 @@ class EsmerilWebApp:
                 self.prev_state = False
 
             # print axisXY pos from left
-            print(self.plc_controller_left.get_AxisXYCurrentPos())
+            # print(self.plc_controller_left.get_AxisXYCurrentPos())
 
             if self.plc_parser.ctw_cam["TRIG_ESME"] ^ self.prev_state:
                 if self.prev_state == True:
@@ -185,21 +185,21 @@ class EsmerilWebApp:
                     axis = 3
                     i = 0
                     # ---------------------------------------------------
-                    self.plc_controller_left.move_2Axis(axis, x_left.pop(i), y_left.pop(i))
-                    self.plc_controller_right.move_2Axis(axis, x_right.pop(i), y_right.pop(i))
-                    time.sleep(2)
-                    self.plc_controller_right.move_2Axis(axis, x_right.pop(0), y_right.pop(0))
-                    time.sleep(2)
-                    for i in range(0, len(x_right), 2):
-                        for j in range(2):
-                            if i + j < len(x_right):
-                                self.plc_controller_left.move_2Axis(axis, x_left[i + j], y_left[i + j])
-                                time.sleep(0.1)
-                                self.plc_controller_right.move_2Axis(axis, x_right[i + j], y_right[i + j])
-                                time.sleep(4)  
-                        time.sleep(2)
+                    # posicionar ambos en el de la derecha en -50, -50 y el de la izquierda en -50, -300
+                    self.move_2drives(-50, -50, -50, -300)
 
-                    self.plc_controller_left.move_2Axis(axis, x_left[-1], y_left[-1])
+                    # Iniciar los pasos de la secuencia tomando de 3 en 3
+                    for i in range(0, len(x_right), 3):
+                        # ejecutar el primero en simultaneo y los otros 2 primero el derecho luego el izquierdo
+                        self.move_2drives(x_right[i], y_right[i], x_left[i], y_left[i])
+                        time.sleep(0.2)
+                        self.move_1drive(x_right[i + 1], y_right[i + 1], "right")
+                        time.sleep(0.2)
+                        self.move_1drive(x_right[i + 2], y_right[i + 2], "right")
+                        time.sleep(0.2)
+                        self.move_1drive(x_left[i + 1], y_left[i + 1], "left")
+                        time.sleep(0.2)
+                        self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
 
                     self.plc_parser.stw_cam["BUSY"] = False
                     self.plc_parser.stw_cam["ERROR"] = False
