@@ -198,8 +198,10 @@ class FMC4030:
     
     def get_AxisXYCurrentPos(self):
         currentPos = (c_float * 2)()
-        self.Axis_Comm_Status[int(axisX.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axisX, pointer(currentPos[0]))
-        self.Axis_Comm_Status[int(axisY.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axisY, pointer(currentPos[1]))
+        axis_X = c_int(0)
+        axis_Y = c_int(1)
+        self.Axis_Comm_Status[int(axis_X.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axis_X, pointer(currentPos[0]))
+        self.Axis_Comm_Status[int(axis_Y.value)] = self.fmc4030.FMC4030_Get_Axis_Current_Pos(self.id, axis_Y, pointer(currentPos[1]))
         currentPos = (int(round(currentPos[0])), int(round(currentPos[1])))
         print("Current Pos: ", currentPos)
         time.sleep(0.03)
