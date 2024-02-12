@@ -127,7 +127,7 @@ def measure_welding(img):
     t3 = f'Dist: {dist_mm} mm - Pix: {dist}'
     img_ori = cv2.putText(img_ori, t1, (int(img_w/4), int(img_h/2) + 20), font, 0.4, color1, 1, cv2.LINE_AA)
     img_ori = cv2.putText(img_ori, t2, (int(3*img_w/5), int(img_h/2) + 20), font, 0.4, color2, 1, cv2.LINE_AA)
-    img_ori = cv2.putText(img_ori, t3, (int(img_w/2) + 30, int(img_h/2) - 40), font, 0.4, (255,0, 255), 1, cv2.LINE_AA)
+    img_ori = cv2.putText(img_ori, t3, (int(img_w/2) + 30, int(img_h/2) - 50), font, 0.4, (255,0, 255), 1, cv2.LINE_AA)
     
     return img_ori, dist_mm, dx1, dx2, err
 
