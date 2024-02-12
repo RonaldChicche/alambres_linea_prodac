@@ -185,12 +185,8 @@ class EsmerilWebApp:
                     axis = 3
                     i = 0
                     # ---------------------------------------------------
-                    # posicionar ambos en el de la derecha en -50, en el ejex en ambos
-                    self.plc_controller_right.absMove(AxePos=-50)
-                    self.plc_controller_left.absMove(AxePos=-50)
                     # posicionar en -50 y -300 en el ejey respectivamente cada 1
-                    self.plc_controller_right.move_2Axis(axis, -50, -50)
-                    self.plc_controller_left.move_2Axis(axis, -50, -300)
+                    self.move_2drives(-50, -50, -50, -300)
 
                     # Iniciar los pasos de la secuencia tomando de 3 en 3
                     for i in range(0, len(x_right), 3):
@@ -204,6 +200,9 @@ class EsmerilWebApp:
                         self.move_1drive(x_left[i + 1], y_left[i + 1], "left")
                         time.sleep(0.2)
                         self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
+
+                    self.plc_controller_right.abs_Move(AxePos=-50)
+                    self.plc_controller_left.abs_Move(AxePos=-50)
 
                     self.plc_parser.stw_cam["BUSY"] = False
                     self.plc_parser.stw_cam["ERROR"] = False
