@@ -42,8 +42,8 @@ class EsmerilWebApp:
                 self.plc_controller_left.stop_Run(id=self.plc_controller_left.id)
                 # Move both drive on x axis to -50
                 print("Moviendo a posicion de sefuridad -50")
-                self.plc_controller_right.absMove(AxePos=-50)
-                self.plc_controller_left.absMove(AxePos=-50)
+                self.plc_controller_right.abs_Move(AxePos=-50)
+                self.plc_controller_left.abs_Move(AxePos=-50)
                 print(" ++++++++++++++++++ Terminando movimiento: Tiempo de ejecucion excedido")
                 return 0
 
@@ -54,8 +54,8 @@ class EsmerilWebApp:
                 self.plc_controller_left.stop_Run(id=self.plc_controller_left.id)
                 # Move both drive on x axis to -50
                 print("Moviendo a posicion de sefuridad -50")
-                self.plc_controller_right.absMove(AxePos=-50)
-                self.plc_controller_left.absMove(AxePos=-50)
+                self.plc_controller_right.abs_Move(AxePos=-50)
+                self.plc_controller_left.abs_Move(AxePos=-50)
                 print(" ++++++++++++++++++ Terminando movimiento: Trigger falso")
                 return 0
             
@@ -80,7 +80,7 @@ class EsmerilWebApp:
                     self.plc_controller_right.stop_Run(id=self.plc_controller_right.id)
                     # Move both drive on x axis to -50
                     print("Moviendo a posicion de sefuridad -50")
-                    self.plc_controller_right.absMove(AxePos=-50)
+                    self.plc_controller_right.abs_Move(AxePos=-50)
                     print(" ++++++++++++++++++ Terminando movimiento: Trigger falso")
                     return 0
                 
@@ -101,7 +101,7 @@ class EsmerilWebApp:
                     self.plc_controller_left.stop_Run(id=self.plc_controller_left.id)
                     # Move both drive on x axis to -50
                     print("Moviendo a posicion de sefuridad -50")
-                    self.plc_controller_left.absMove(AxePos=-50)
+                    self.plc_controller_left.abs_Move(AxePos=-50)
                     print(" ++++++++++++++++++ Terminando movimiento: Trigger falso")
                     return 0
                 
@@ -149,13 +149,14 @@ class EsmerilWebApp:
                 print(f" ++++++++++++++++++ Iniciando rutina de control de esmeril: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
                 
                 self.plc_parser.stw_cam["READY"] = False
+                error = 0
                 x_right, y_right, x_left, y_left = self.generar_trayectoria(self.diametro_interior/2, 
                                                                             self.radio_exterior, 6, 
                                                                             (-179, -177 + 2), (-202-3, -164 + 2))
                 # verify if setpoints do not exceed the limits
-                for i in range(len(x_right)):
-                    if self.distancia_coor(x_right[i], y_right[i], x_left[i], y_left[i]) < 203:
-                        error = 4
+                # for i in range(len(x_right)):
+                #     if self.distancia_coor(x_right[i], y_right[i], x_left[i], y_left[i]) < 203:
+                #         error = 4
 
                 # # verify if drives are home -----------------------------
                 # if self.plc_controller_right.get_AxisHomeStatus(3) == 0 or self.plc_controller_left.get_AxisHomeStatus(3) == 0:

@@ -70,7 +70,6 @@ def measure_welding(img):
     dx1 = obj[0][2]
     dx2 = obj[1][2]
     dist = o2 - o1
-    # 0.018340276018071585 * x + 0.33740196290504976
     dist_mm = round(0.018340276018071585 * dist + 0.33740196290504976, 2)
     
     for rect in rects:
