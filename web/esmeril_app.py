@@ -41,10 +41,10 @@ class EsmerilWebApp:
         self.plc_controller_left.move_2Axis(3, x1, y1)
         while True:
             # check if has passed 10 seconds
-            if time.time() - start_time > 15:
+            if time.time() - start_time > 20:
                 print(" ++++++++++++++++++ Stop Process: Tiempo de ejecucion excedido")
-                self.plc_controller_right.stop()
-                self.plc_controller_left.stop()
+                self.plc_controller_right.stop_Run(id=self.plc_controller_right.id)
+                self.plc_controller_left.stop_Run(id=self.plc_controller_left.id)
                 # Move both drive on x axis to -50
                 print("Moviendo a posicion de sefuridad -50")
                 self.plc_controller_right.absMove(AxePos=-50)
@@ -55,8 +55,8 @@ class EsmerilWebApp:
             # check if trigger is false
             if self.plc_parser.ctw_cam["TRIG_ESME"] == False:
                 print(" ++++++++++++++++++ Stop Process: Trigger falso")
-                self.plc_controller_right.stop()
-                self.plc_controller_left.stop()
+                self.plc_controller_right.stop_Run(id=self.plc_controller_right.id)
+                self.plc_controller_left.stop_Run(id=self.plc_controller_left.id)
                 # Move both drive on x axis to -50
                 print("Moviendo a posicion de sefuridad -50")
                 self.plc_controller_right.absMove(AxePos=-50)
@@ -82,7 +82,7 @@ class EsmerilWebApp:
                 # check if trigger is false
                 if self.plc_parser.ctw_cam["TRIG_ESME"] == False:
                     print(" ++++++++++++++++++ Stop Process: Trigger falso")
-                    self.plc_controller_right.stop()
+                    self.plc_controller_right.stop_Run(id=self.plc_controller_right.id)
                     # Move both drive on x axis to -50
                     print("Moviendo a posicion de sefuridad -50")
                     self.plc_controller_right.absMove(AxePos=-50)
@@ -103,7 +103,7 @@ class EsmerilWebApp:
                 # check if trigger is false
                 if self.plc_parser.ctw_cam["TRIG_ESME"] == False:
                     print(" ++++++++++++++++++ Stop Process: Trigger falso")
-                    self.plc_controller_left.stop()
+                    self.plc_controller_left.stop_Run(id=self.plc_controller_left.id)
                     # Move both drive on x axis to -50
                     print("Moviendo a posicion de sefuridad -50")
                     self.plc_controller_left.absMove(AxePos=-50)
