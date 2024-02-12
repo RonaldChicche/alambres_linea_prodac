@@ -9,7 +9,7 @@ import numpy as np
 def measure_welding(img):
     err = 0
     # Cut, resize layer
-    x1, y1, x2, y2 = 820, 450, 995, 700
+    x1, y1, x2, y2 = 830, 450, 1000, 700
     img = img[y1:y2, x1:x2]
     img = cv2.resize(img, (0, 0), fx=3, fy=1)
     img_h, img_w, _ = img.shape
@@ -40,6 +40,10 @@ def measure_welding(img):
     # Encontrar los contornos en la imagen
     mid_blobs, _ = cv2.findContours(mid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     best_mid_left, best_mid_right = get_best_weld_blob(mid_blobs, center_x)
+    if best_mid_left is None or best_mid_right is None:
+        err = 1
+        print("-----------------Low accuracy 1: no detections")
+        return img_ori, None, None, None, err
 
     # Get contours
     contours = [best_mid_right, best_mid_left]
@@ -70,13 +74,36 @@ def measure_welding(img):
         x, y, w, h = rect
         if rect in obj:
             cv2.rectangle(img_ori, (x, y), (x+w, y+h), (255, 0, 255), 2)
+    # Evaluate if one of the objects are crossingthe whole image
+    # take their geometric centers and evaluate if they are close the the middle of the whole image evalauting the absolute of their difference is less than a 20 pix
+    if abs((obj[0][0] + obj[0][2] / 2) - img_w / 2) < 20 or abs((obj[1][0] + obj[1][2] / 2) - img_w / 2) < 20:
+        print("--------------------------> Low accuracy 2:  objects crossing the whole image")
+        err = 2
+        return img_ori, None, None, None, err
+
+    # Verify if obj belongs to  their side 
+    # take the one on the left and compare their x position to the 25% of the wide
+    no_left = False
+    no_right = False
+    if obj[0][0] > img_w / 4 or obj[0][2] < 10:
+        no_left = True
+    # take the one on the right and compare the sum of its x and w to the 75% of the wide
+    if obj[1][0] + obj[1][2] < 3 * img_w / 4 or obj[1][2] < 10:
+        no_right = True
     
-    
-    # if obj[0][2] * obj[0][3] < 1000 or obj[1][2] * obj[1][3] < 1000:
-    #     print("Low accuracy 3")
-    #     err = 3
-    #     return img_ori, None, None, None, err
-    
+    if no_right and no_right:
+        print("--------------------------> Low accuracy 3:  objects not found")
+        err = 3
+        return img_ori, None, None, None, err
+    elif no_left or no_right:
+        if no_right:
+            err = 4
+            print("--------------------------> Low accuracy 4:  right not found")
+            return img_ori, None, None, None, err
+        if no_left:
+            err = 4
+            print("--------------------------> Low accuracy 4:  left not found")
+            return img_ori, None, None, None, err   
     
     if obj[0][2] + dist + obj[1][2] > img_w:
         print("Low accuracy 4:", end=" ")

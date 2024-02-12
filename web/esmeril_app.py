@@ -11,13 +11,8 @@ class EsmerilWebApp:
         self.plc_parser = None
         self.thread_plc = None
         # variables 
-        self.num_toques = 6
-        self.radio_exterior = 130
-        self.diametro_interior = 10
-        self.centro_x = -192
-        self.centro_y = -160
-        self.angulo_inicio = 90
-        self.angulo_fin = 270
+        self.radio_exterior = 101
+        self.diametro_interior = 7
         self.dt = 0.5
         # define left and right drives
         self.plc_controller_right = None
@@ -128,8 +123,7 @@ class EsmerilWebApp:
         # calculo de la distancia
         return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-    def plc_control(self):
-        
+    def plc_control(self):        
         # # Test
         self.plc_controller_right = self.plc_parser.CtrlFMC[3]
         self.plc_controller_left = self.plc_parser.CtrlFMC[2]
@@ -138,9 +132,12 @@ class EsmerilWebApp:
         while self.run: 
             # print(f"Esperando trigger --------------------------------------------------------------------------{self.plc_parser.ctw_cam}")
             # # Rutina de ejecucion
+            #print(f"Left pos: {self.plc_controller_left.get_AxisCurrentPos(self.plc_controller_left.axisY)}")
             if self.plc_parser.ctw_cam["TRIG_ESME"] == False:
                 # self.plc_parser.stw_cam["READY"] = True
                 self.prev_state = False
+                # print(f" ++++++++++++++++++ Reiniciando bit: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
+
 
             # print axisXY pos from left
             # print(self.plc_controller_left.get_AxisXYCurrentPos())
@@ -148,9 +145,13 @@ class EsmerilWebApp:
             if self.plc_parser.ctw_cam["TRIG_ESME"] ^ self.prev_state:
                 if self.prev_state == True:
                     continue
+
+                print(f" ++++++++++++++++++ Iniciando rutina de control de esmeril: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
                 
                 self.plc_parser.stw_cam["READY"] = False
-                x_right, y_right, x_left, y_left, error = self.generar_trayectoria(self.num_toques, self.radio_exterior, self.diametro_interior, self.centro_x, self.centro_y, self.angulo_inicio, self.angulo_fin)
+                x_right, y_right, x_left, y_left = self.generar_trayectoria(self.diametro_interior/2, 
+                                                                            self.radio_exterior, 6, 
+                                                                            (-179, -177 + 2), (-202-3, -164 + 2))
                 # verify if setpoints do not exceed the limits
                 for i in range(len(x_right)):
                     if self.distancia_coor(x_right[i], y_right[i], x_left[i], y_left[i]) < 203:
@@ -200,7 +201,7 @@ class EsmerilWebApp:
                         self.move_1drive(x_left[i + 1], y_left[i + 1], "left")
                         time.sleep(0.2)
                         self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
-
+                        
                     self.plc_controller_right.abs_Move(AxePos=-50)
                     self.plc_controller_left.abs_Move(AxePos=-50)
 
@@ -209,50 +210,78 @@ class EsmerilWebApp:
                     
                     self.plc_parser.stw_cam["READY"] = True
                 self.prev_state = self.plc_parser.ctw_cam["TRIG_ESME"]
+                print(f" ++++++++++++++++++ Terminando rutina de control de esmeril: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
         
 
 
-    def generar_trayectoria(self, num_toques, radio_exterior, diametro_interior, centro_x, centro_y, angulo_inicio, angulo_fin):
-        """Genera una lista de puntos para una trayectoria estrella de N puntas con radio exterior y radio interior
-            Error 1: radio_exterior < radio_interior + 101.6
-            Error 2: num_toques < 3
-            Error 3: centro de la estrella fuera de rango """
+    def generar_trayectoria(self, radio:float, radio_esmeril:float, num_lados:int, right_center:tuple, left_center:tuple):
+        """ Genera una trayectoria de un poligono regular con circunferencia inscrita
+        Args:
+            radio (float): radio del poligono
+            radio_esmeril (float): radio de la circunferencia inscrita
+            num_lados (int): numero de lados del poligono, siempre par y mayor a 2
+            right_center (tuple): centro del lado derecho
+            left_center (tuple): centro del lado izquierdo
+        Returns:
+            lists: (x_right, y_right, x_left, y_left)"""
+        # raise error if num_lados is less than 3 an uneven
+        if num_lados < 3 or num_lados % 2 != 0:
+            raise ValueError("num_lados must be an even number greater than 2")
+        # Definir angulo de inicio del lado derecho 
+        angulo_init = np.pi / 2
+        # Definir longitud de trayectoria
+        path = 150
+        
+        # Definir limites
+        x_limit = -215
+        y_limit = -330
+        # calcular cantidad de angulos segun el numero de lados
+        angulos = np.linspace(angulo_init, angulo_init + 2 * np.pi, num_lados, endpoint=False)
+        # Calcular los puntos (vértices del polígono excrito al radio) considerando el radio_esmeril
+        x = (radio_esmeril + radio) * np.cos(angulos)
+        y = (radio_esmeril + radio) * np.sin(angulos)
+
+        # generar lineas tangentes a la circunferencia de radio esmeril que pasen por los puntos x, y
+        points = []
+        for i in range(num_lados):
+            # Calcular la pendiente de la recta tangente
+            m = np.arctan2(y[i],x[i]) + np.pi/2
+            # Calcular el 2 puntos de la recta tangente con la circunferencia de radio esmeril que pasa por y[i], x[i]
+            x1 = x[i] + path/2 * np.cos(m)
+            y1 = y[i] + path/2 * np.sin(m)
+            x2 = x[i] - path/2 * np.cos(m)
+            y2 = y[i] - path/2 * np.sin(m)
+            # add them to ppoints as tuple (x1, y1) (x2, y2)
+            points.append((x1, y1))
+            points.append((x2, y2))
+            points.append((x1, y1))
             
-        angulo_inicio = np.deg2rad(angulo_inicio)
-        angulo_fin = np.deg2rad(angulo_fin)
+        # divide them in left and right from the center
+        points_right = points[:len(points)//2]
+        points_left = points[len(points)//2:]
+        # turn them  into numpy arrays
+        points_right = np.array(points_right)
+        points_left = np.array(points_left)
+        # translate them to the center
+        points_right = (points_right.round() + right_center).astype(int)
+        points_left = (points_left.round() + left_center).astype(int)
+        # invert points_right by the x axis taking right_center x as reference to reflect
+        points_right[:, 0] = 2 * right_center[0] - points_right[:, 0]
+        # recorre points right and left de 3 en tres
+        for i in range(0, len(points_right), 3):
+            for j in range(2):
+                if i + j < len(points_right):
+                    # apply x limit
+                    if points_right[i + j][0] < x_limit:
+                        points_right[i + j][0] = x_limit
+                    if points_left[i + j][0] < x_limit:
+                        points_left[i + j][0] = x_limit
+        # split points_right and points_left into x, y right and left
+        x, y = zip(*points_right)
+        x_right = list(x)
+        y_right = list(y)
+        x, y = zip(*points_left)
+        x_left = list(x)
+        y_left = list(y)
 
-        # Transforma radios
-        radio_interior = diametro_interior / 2 + 100.6
-        if radio_exterior < radio_interior:
-            return None, None, None, None, 1
-        elif num_toques < 3:
-            return None, None, None, None, 2
-        # Calcula los ángulos para los vértices exteriores e interiores de la estrella
-        angulos_right = np.linspace(angulo_inicio, angulo_fin, num_toques + 1)
-        angulos_left = angulos_right + np.pi
-
-        # Calcula las coordenadas de los puntos exteriores e interiores de la estrella
-        centro_x = -176
-        centro_y = -176
-        x_exterior = -radio_exterior * np.cos(angulos_right) + centro_x
-        y_exterior = radio_exterior * np.sin(angulos_right) + centro_y 
-        x_interior = -radio_interior * np.cos(angulos_right) + centro_x 
-        y_interior = radio_interior * np.sin(angulos_right) + centro_y
-
-        # Combina las coordenadas para formar la estrella
-        x_right = [int(item) for pair in zip(x_exterior, x_interior) for item in pair]
-        y_right = [int(item) for pair in zip(y_exterior, y_interior) for item in pair]
-
-        # Calcula las coordenadas de los puntos exteriores e interiores de la estrella
-        centro_x = -213
-        centro_y = -179
-        x_exterior = radio_exterior * np.cos(angulos_left) + centro_x 
-        y_exterior = radio_exterior * np.sin(angulos_left) + centro_y 
-        x_interior = radio_interior * np.cos(angulos_left) + centro_x 
-        y_interior = radio_interior * np.sin(angulos_left) + centro_y 
-
-        # Combina las coordenadas para formar la estrella
-        x_left = [int(item) for pair in zip(x_exterior, x_interior) for item in pair]
-        y_left = [int(item) for pair in zip(y_exterior, y_interior) for item in pair]
-
-        return x_right[:-1], y_right[:-1], x_left[:-1], y_left[:-1], 0
+        return x_right, y_right, x_left, y_left
