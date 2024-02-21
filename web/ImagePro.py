@@ -6,10 +6,10 @@ import numpy as np
 # - Grinding quality control
 # - Obstacle machine area free detector
 
-def measure_welding(img):
+def measure_welding(img, debug=False):
     err = 0
     # Cut, resize layer
-    x1, y1, x2, y2 = 965, 470, 1180, 750
+    x1, y1, x2, y2 = 935, 470, 1170, 750
     img = img[y1:y2, x1:x2]
     img = cv2.resize(img, (0, 0), fx=4, fy=1)
     img_h, img_w, _ = img.shape
@@ -33,12 +33,12 @@ def measure_welding(img):
     dy = dy.astype(np.uint8)
     _, mid = cv2.threshold(dy, 0.5 * 255, 255, cv2.THRESH_BINARY)
     mid_temp = cv2.dilate(mid, kernel, iterations=13)
-    mid = cv2.erode(mid_temp, kernel, iterations=13)
+    mid_fin = cv2.erode(mid_temp, kernel, iterations=13)
 
     # get x position of the center of the image
     center_x = img.shape[1] / 2
     # Encontrar los contornos en la imagen
-    mid_blobs, _ = cv2.findContours(mid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    mid_blobs, _ = cv2.findContours(mid_fin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     best_mid_left, best_mid_right = get_best_weld_blob(mid_blobs, center_x)
     if best_mid_left is None or best_mid_right is None:
         err = 1
@@ -56,6 +56,9 @@ def measure_welding(img):
     if len(obj) != 2:
         print("Low accuracy 2")
         err = 2
+        if debug is True:
+            return img_ori, thresh, dy, mid, mid_fin
+    
         return img_ori, None, None, None, err
     
     # Sort the objects by position
@@ -76,11 +79,15 @@ def measure_welding(img):
         x, y, w, h = rect
         if rect in obj:
             cv2.rectangle(img_ori, (x, y), (x+w, y+h), (255, 0, 255), 2)
+
     # Evaluate if one of the objects are crossingthe whole image
     # take their geometric centers and evaluate if they are close the the middle of the whole image evalauting the absolute of their difference is less than a 20 pix
     if abs((obj[0][0] + obj[0][2] / 2) - img_w / 2) < 20 or abs((obj[1][0] + obj[1][2] / 2) - img_w / 2) < 20:
         print("--------------------------> Low accuracy 2:  objects crossing the whole image")
         err = 2
+        if debug is True:
+            return img_ori, thresh, dy, mid, mid_fin
+
         return img_ori, None, None, None, err
 
     # Verify if obj belongs to  their side 
@@ -96,15 +103,21 @@ def measure_welding(img):
     if no_right and no_right:
         print("--------------------------> Low accuracy 3:  objects not found")
         err = 3
+        if debug is True:
+            return img_ori, thresh, dy, mid, mid_fin
         return img_ori, None, None, None, err
     elif no_left or no_right:
         if no_right:
             err = 4
             print("--------------------------> Low accuracy 4:  right not found")
+            if debug is True:
+                return img_ori, thresh, dy, mid, mid_fin
             return img_ori, None, None, None, err
         if no_left:
             err = 4
             print("--------------------------> Low accuracy 4:  left not found")
+            if debug is True:
+                return img_ori, thresh, dy, mid, mid_fin
             return img_ori, None, None, None, err   
     
     if obj[0][2] + dist + obj[1][2] > img_w:
@@ -130,7 +143,10 @@ def measure_welding(img):
     img_ori = cv2.putText(img_ori, t1, (int(img_w/4), int(img_h/2) + 20), font, 0.4, color1, 1, cv2.LINE_AA)
     img_ori = cv2.putText(img_ori, t2, (int(3*img_w/5), int(img_h/2) + 20), font, 0.4, color2, 1, cv2.LINE_AA)
     img_ori = cv2.putText(img_ori, t3, (int(img_w/2) + 30, int(img_h/2) - 50), font, 0.4, (255,0, 255), 1, cv2.LINE_AA)
-    
+
+    if debug is True:
+        return img_ori, thresh, dy, mid, mid_fin
+
     return img_ori, dist_mm, dx1, dx2, err
 
 def get_best_weld_blob(blobs, center_x):

@@ -322,7 +322,7 @@ class PLCDataParser(HTTPDataSender):
         if (self.ctw_plc["AbsXY"] ^ self.ctw_plc["AbsXZ"] ^ self.ctw_plc["AbsYZ"]) :
             axe = 3 if self.ctw_plc["AbsXY"] else 5 if self.ctw_plc["AbsXZ"] else 6 if self.ctw_plc["AbsYZ"] else 3
                 
-            CtrlFMC.move_2Axis(axe, self.data_struc["2AxisS_XY"]["SP_POSX"], self.data_struc["2Axis_XY"]["SP_POSY"], self.data_struc["2Axis_XY"]["SP_VEL"], self.data_struc["2Axis_XY"]["ACC"], self.data_struc["2Axis_XY"]["DEC"])
+            CtrlFMC.move_2Axis(axe, self.data_struc["2Axis_XY"]["SP_POSX"], self.data_struc["2Axis_XY"]["SP_POSY"], self.data_struc["2Axis_XY"]["SP_VEL"], self.data_struc["2Axis_XY"]["ACC"], self.data_struc["2Axis_XY"]["DEC"])
         if self.ctw_plc["StopRun"]:
             CtrlFMC.stop_Run(self.id)
             
@@ -408,10 +408,18 @@ class PLCDataParser(HTTPDataSender):
                     start_time = time.perf_counter()
                     self.id = x
 
-                    # Verify conection and status
+                    # Verifica el status y que lo intente 3 veces antes de desconectar y conectar
+                    disco = 0
+                    for t in range(3):
+                        st = self.CtrlFMC[self.id].get_Status()
                     
-                    st = self.CtrlFMC[self.id].get_Status()
-                    if st == -1:
+                        if st == -1:
+                            disco = disco + 1
+                            time.sleep(1)
+                        else:
+                            break
+
+                    if disco == 3:
                         req_stat = [None]  # Mutable var so the function can store the result
                         def func():
                             req_stat[0] = self.CtrlFMC[self.id].disconnect_Machine()
@@ -421,12 +429,14 @@ class PLCDataParser(HTTPDataSender):
                         thread.start()
 
                         # Wait for 2 seconds or until the thread finishes, whichever comes first
-                        thread.join(timeout=2)
+                        thread.join(timeout=6)
 
                         if thread.is_alive():
                             print("-> Timeout Check from ClientS7 - Connection: ", self.id)
                         
-                        continue 
+                        continue
+
+                     
                                         
                     if x == 0:
                         if self.CtrlFMC[self.id].Axis_RealPos[0] >= 1500:

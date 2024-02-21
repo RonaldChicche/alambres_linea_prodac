@@ -32,9 +32,20 @@ while True:
     # Si el fotograma se leyó correctamente
     if ret:
         # Procesar el fotograma
-        img, dist_mm, dx1, dx2, err = measure_welding(frame)
+        img_ori, thresh, dy, mid, mid_fin = measure_welding(frame, debug=True)
+        # print dimensions of each image
+        print(f'img_ori: {img_ori.shape}')
+        print(f'thresh: {thresh.shape}')
+        print(f'dy: {dy.shape}')
+        print(f'mid: {mid.shape}')
+        print(f'mid_fin: {mid_fin.shape}')
+        # Concatenate imgages
+        img = np.concatenate((thresh, dy, mid, mid_fin), axis=0)
+        # escalar la imagen
+        img = cv2.resize(img, (int(img.shape[1]/2), int(img.shape[0]/2)))
         # Mostrar el fotograma procesado
         cv2.imshow('frame', img)
+        cv2.imshow('frame_ori', img_ori)
         # Si se presiona la tecla 'q', salir del bucle
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

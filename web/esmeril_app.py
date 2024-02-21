@@ -45,7 +45,7 @@ class EsmerilWebApp:
                 self.plc_controller_right.abs_Move(AxePos=-50)
                 self.plc_controller_left.abs_Move(AxePos=-50)
                 print(" ++++++++++++++++++ Terminando movimiento: Tiempo de ejecucion excedido")
-                return 0
+                return -2
 
             # check if trigger is false
             if self.plc_parser.ctw_cam["TRIG_ESME"] == False:
@@ -57,7 +57,7 @@ class EsmerilWebApp:
                 self.plc_controller_right.abs_Move(AxePos=-50)
                 self.plc_controller_left.abs_Move(AxePos=-50)
                 print(" ++++++++++++++++++ Terminando movimiento: Trigger falso")
-                return 0
+                return -1
             
             rpos_x, rpos_y = self.plc_controller_right.get_AxisXYCurrentPos()
             lpos_x, lpos_y = self.plc_controller_left.get_AxisXYCurrentPos()
@@ -82,7 +82,7 @@ class EsmerilWebApp:
                     print("Moviendo a posicion de sefuridad -50")
                     self.plc_controller_right.abs_Move(AxePos=-50)
                     print(" ++++++++++++++++++ Terminando movimiento: Trigger falso")
-                    return 0
+                    return -1
                 
                 rpos_x, rpos_y = self.plc_controller_right.get_AxisXYCurrentPos()
                 if abs(rpos_x - x) < 0.1 and abs(rpos_y - y) < 0.1:
@@ -103,7 +103,7 @@ class EsmerilWebApp:
                     print("Moviendo a posicion de sefuridad -50")
                     self.plc_controller_left.abs_Move(AxePos=-50)
                     print(" ++++++++++++++++++ Terminando movimiento: Trigger falso")
-                    return 0
+                    return -1
                 
                 lpos_x, lpos_y = self.plc_controller_left.get_AxisXYCurrentPos()
                 if abs(lpos_x - x) < 0.1 and abs(lpos_y - y) < 0.1:
@@ -151,7 +151,7 @@ class EsmerilWebApp:
                 self.plc_parser.stw_cam["READY"] = False
                 error = 0
                 x_right, y_right, x_left, y_left = self.generar_trayectoria(self.diametro_interior/2, 
-                                                                            self.radio_exterior, 6, 
+                                                                            self.radio_exterior, 12, 
                                                                             (-179, -177 + 2), (-202-3, -164 + 2))
                 # verify if setpoints do not exceed the limits
                 # for i in range(len(x_right)):
@@ -193,16 +193,26 @@ class EsmerilWebApp:
                     # Iniciar los pasos de la secuencia tomando de 3 en 3
                     for i in range(0, len(x_right), 3):
                         # ejecutar el primero en simultaneo y los otros 2 primero el derecho luego el izquierdo
-                        self.move_2drives(x_right[i], y_right[i], x_left[i], y_left[i])
+                        res = self.move_2drives(x_right[i], y_right[i], x_left[i], y_left[i])
+                        if res == -1 or res == -2:
+                            break
                         time.sleep(0.2)
-                        self.move_1drive(x_right[i + 1], y_right[i + 1], "right")
+                        res = self.move_1drive(x_right[i + 1], y_right[i + 1], "right")
+                        if res == -1 or res == -2:
+                            break
                         time.sleep(0.2)
-                        self.move_1drive(x_right[i + 2], y_right[i + 2], "right")
+                        res = self.move_1drive(x_right[i + 2], y_right[i + 2], "right")
+                        if res == -1 or res == -2:
+                            break
                         time.sleep(0.2)
-                        self.move_1drive(x_left[i + 1], y_left[i + 1], "left")
+                        res = self.move_1drive(x_left[i + 1], y_left[i + 1], "left")
+                        if res == -1 or res == -2:
+                            break
                         time.sleep(0.2)
-                        self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
-                        
+                        res = self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
+                        if res == -1 or res == -2:
+                            break
+
                     self.plc_controller_right.abs_Move(AxePos=-50)
                     self.plc_controller_left.abs_Move(AxePos=-50)
 
@@ -225,13 +235,15 @@ class EsmerilWebApp:
             left_center (tuple): centro del lado izquierdo
         Returns:
             lists: (x_right, y_right, x_left, y_left)"""
+        # Print characteristics
+        print(f"Radio: {radio}, Radio Esmeril: {radio_esmeril}, Num Lados: {num_lados}, Right Center: {right_center}, Left Center: {left_center}")
         # raise error if num_lados is less than 3 an uneven
         if num_lados < 3 or num_lados % 2 != 0:
             raise ValueError("num_lados must be an even number greater than 2")
         # Definir angulo de inicio del lado derecho 
         angulo_init = np.pi / 2
         # Definir longitud de trayectoria
-        path = 150
+        path = 70
         
         # Definir limites
         x_limit = -215
