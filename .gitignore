@@ -2,7 +2,6 @@
 .venv/include/
 .venv/lib/
 .venv/pyvenv.cfg
-wsdl/
 .venv/Scripts/
 *.pyc
 __pycache__/
