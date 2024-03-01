@@ -9,7 +9,7 @@ import numpy as np
 def measure_welding(img, debug=False):
     err = 0
     # Cut, resize layer
-    x1, y1, x2, y2 = 935, 470, 1170, 750
+    x1, y1, x2, y2 = 985, 470, 1195, 750
     img = img[y1:y2, x1:x2]
     img = cv2.resize(img, (0, 0), fx=4, fy=1)
     img_h, img_w, _ = img.shape
@@ -40,25 +40,28 @@ def measure_welding(img, debug=False):
     # Encontrar los contornos en la imagen
     mid_blobs, _ = cv2.findContours(mid_fin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     best_mid_left, best_mid_right = get_best_weld_blob(mid_blobs, center_x)
-    if best_mid_left is None or best_mid_right is None:
+    if best_mid_left is None and best_mid_right is None:
         err = 1
         print("-----------------Low accuracy 1: no detections")
         return img_ori, None, None, None, err
 
     # Get contours
-    contours = [best_mid_left, best_mid_right]
+    if best_mid_left is None:
+        contours = [best_mid_right]
+    else:
+        contours = [best_mid_left, best_mid_right]
     
+    # print("COntour:", contours)
     obj = [(x, y, w, h) for contour in contours for x, y, w, h in [cv2.boundingRect(contour)]]
     rects = obj
-    # obj = sorted(rects, key=lambda x: x[2]*x[3], reverse=True)[:2]
 
     # print(obj)
-    if len(obj) != 2:
-        print("Low accuracy 2")
+    if len(obj) < 2:
+        print("Low accuracy 2: Falta uno de los alambres")
         err = 2
         if debug is True:
             return img_ori, thresh, dy, mid, mid_fin
-    
+
         return img_ori, None, None, None, err
     
     # Sort the objects by position
@@ -83,8 +86,8 @@ def measure_welding(img, debug=False):
     # Evaluate if one of the objects are crossingthe whole image
     # take their geometric centers and evaluate if they are close the the middle of the whole image evalauting the absolute of their difference is less than a 20 pix
     if abs((obj[0][0] + obj[0][2] / 2) - img_w / 2) < 20 or abs((obj[1][0] + obj[1][2] / 2) - img_w / 2) < 20:
-        print("--------------------------> Low accuracy 2:  objects crossing the whole image")
-        err = 2
+        print("--------------------------> Low accuracy 3:  objects crossing the whole image")
+        err = 3
         if debug is True:
             return img_ori, thresh, dy, mid, mid_fin
 
@@ -94,15 +97,16 @@ def measure_welding(img, debug=False):
     # take the one on the left and compare their x position to the 25% of the wide
     no_left = False
     no_right = False
-    if obj[0][0] > img_w / 4:
+    print(f"RIGHT w: {obj[1][2]} || LEFT w: {obj[0][2]}")
+    if obj[0][0] > img_w / 4 or obj[0][2] < 50:
         no_left = True
     # take the one on the right and compare the sum of its x and w to the 75% of the wide
-    if obj[1][0] + obj[1][2] < 3 * img_w / 4:
+    if obj[1][0] + obj[1][2] < 3 * img_w / 4 or obj[1][2] < 50:
         no_right = True
     
     if no_right and no_right:
-        print("--------------------------> Low accuracy 3:  objects not found")
-        err = 3
+        print("--------------------------> Low accuracy 4:  objects not found")
+        err = 4
         if debug is True:
             return img_ori, thresh, dy, mid, mid_fin
         return img_ori, None, None, None, err
@@ -129,6 +133,7 @@ def measure_welding(img, debug=False):
     color1 = (255, 255, 0)
     color2 = (0, 255, 0)
     font = cv2.FONT_HERSHEY_SIMPLEX
+    print(obj)
     # Line limits
     img_ori = cv2.line(img_ori, (o1, 0), (o1, img_h-1), color=color1, thickness=1)
     img_ori = cv2.line(img_ori, (o2, 0), (o2, img_h-1), color=color2, thickness=1)
@@ -150,7 +155,9 @@ def measure_welding(img, debug=False):
     return img_ori, dist_mm, dx1, dx2, err
 
 def get_best_weld_blob(blobs, center_x):
-    if blobs and len(blobs) >= 2:
+    if len(blobs) == 0:
+        return None, None
+    if len(blobs) >= 2:
         # Dividir los blobs en dos grupos: izquierda y derecha
         left_blobs = []
         right_blobs = []
@@ -177,9 +184,9 @@ def get_best_weld_blob(blobs, center_x):
 
         # Devolver el blob más grande de cada lado
         return biggest_left_blob, biggest_right_blob
-    else:
-        # Si no hay suficientes contornos, devolver None
-        return None, None
+    elif len(blobs) == 1:
+        # Si solo hay un blob, devolverlo como el blob más grande de la izquierda
+        return blobs[0], None
     
     
 def get_best_blob(blobs):

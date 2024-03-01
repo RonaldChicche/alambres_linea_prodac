@@ -117,6 +117,7 @@ setInterval(get_cam_weld_response, 500);
 // ----------- Welding cam button management --------------------------------
 const startWeldButton = document.getElementById('video-button-weld');
 const shootWeldButton = document.getElementById('shoot-button-weld');
+const shootModelButton = document.getElementById('shoot-button-model');
 
 // Add a click event listener to the shot button and handle the response updating the image and data
 shootWeldButton.addEventListener('click', () => {
@@ -147,6 +148,29 @@ shootWeldButton.addEventListener('click', () => {
     console.error('Error:', error);
   });
 });
+
+// Add a click event listener to the shot button and handle the response updating the image and data
+shootModelButton.addEventListener('click', () => {
+  fetch('/weld_model', {
+    method: 'GET',
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log(data);
+    // data has 2 fields: status, name, confidence, error
+    if (data.status == 200) {
+      cam_weld_measure.innerText = data.name + " " + data.confidence;
+      cam_weld_cod_err.innerText = data.error;
+    }
+    // print everithing in the console less the image
+    console.log(data.status);
+  })
+  .catch((error) => {
+    console.error('Error:', error);
+  });
+});
+
+
 
 // Add a click event listener to the start button read if 
 startWeldButton.addEventListener('click', () => {

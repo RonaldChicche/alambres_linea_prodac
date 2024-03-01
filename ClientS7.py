@@ -115,12 +115,12 @@ class PLCDataParser(HTTPDataSender):
     
     stw_cam = {
         "ERROR": False, "READY": False, "BUSY": False, "AbsXYZ": False, "free05": False, "free04": False, "OK_W": False, "free06": False,
-        "OK_TAIL": False, "ERROR_TAIL": False, "OK_WELD": False, "ERROR_WELD": False, "Home": False, "free01": False, "free10": False, "free11": False  
+        "OK_TAIL": False, "ERROR_TAIL": False, "OK_WELD": False, "ERROR_WELD": False, "OK_MODEL": False, "ERROR_MODEL": False, "free10": False, "free11": False  
     }
 
     ctw_cam = {
-        "AEA": False, "AbsXZ": False, "AbsYZ": False, "TRIG_ESME": False, "ArcXY": False, "ArcXZ": False, "TRIG_WELD": False, "TRIG_TAIL": False,
-        "TRIG_Nah": False, "JogRev": False, "Abs": False, "TRIG_GA": False, "TRIG_NO": False, "Stop": False, "Pause": False, "Reset": False  
+        "AEA": False, "AbsXZ": False, "AbsYZ": False, "TRIG_ESME": False, "ArcXY": False, "TRIG_WELD_AI": False, "TRIG_WELD": False, "TRIG_TAIL": False,
+        "TRI": False, "JogRev": False, "Abs": False, "TRIG_GA": False, "TRIG_NO": False, "Stop": False, "Pause": False, "Reset": False  
     }
 
     cam_struc = {
@@ -429,7 +429,7 @@ class PLCDataParser(HTTPDataSender):
                         thread.start()
 
                         # Wait for 2 seconds or until the thread finishes, whichever comes first
-                        thread.join(timeout=6)
+                        thread.join(timeout=10)
 
                         if thread.is_alive():
                             print("-> Timeout Check from ClientS7 - Connection: ", self.id)

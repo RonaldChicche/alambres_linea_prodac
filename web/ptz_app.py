@@ -1,12 +1,15 @@
 from flask import Flask, Response, render_template
 import os
+import io
 import cv2
 import time
 import base64
+import requests
 import threading
 import numpy as np
 from flask import request
 import cv2 as cv
+from PIL import Image
 # from .CamAIClass import CamAI
 from onvif2 import ONVIFCamera, ONVIFService, ONVIFError
 from .ImagePro import measure_welding, measure_tail
@@ -254,6 +257,7 @@ class CameraWelding(PTZCamera):
 
     def plc_control(self):
         self.prev_state = False
+        self.prev_state_model = False
         # connect streaming ...
         # self.video_stream = cv2.VideoCapture(self.url)
         while self.run:            
@@ -271,11 +275,11 @@ class CameraWelding(PTZCamera):
                 self.plc_parser.stw_cam["OK_WELD"] = False
                 self.plc_parser.stw_cam["ERROR_WELD"] = False
                 self.plc_parser.cam_struc["WELD_MEASURE"] = 0
-                self.plc_parser.cam_struc["ERROR"] = 0
                 self.prev_state = False
 
             if self.plc_parser.ctw_cam['TRIG_WELD'] ^ self.prev_state:  
                 if self.prev_state == True:
+                    self.plc_parser.cam_struc["ERROR"] = 0
                     continue  
                 self.cap = cv2.VideoCapture(self.url)
                 self.response['connected'] = self.cap.isOpened()
@@ -311,57 +315,50 @@ class CameraWelding(PTZCamera):
                 self.update_response()
                 print("-----------------------------------------------------", self.plc_parser.cam_struc)
 
-    def plc_control2(self):
-        self.prev_state = False
-        while True:
-            # Verificar coneccion e intentar reconectar
-            if self.response['connected'] == False:
-                self.response['connected'] = self.connect(self.ip, self.user, self.password)
-                if not self.response['connected']:
-                    self.plc_parser.cam_struc["ERROR"] = 1
-                    time.sleep(5)
+
+            self.response['trigger'] = self.plc_parser.ctw_cam["TRIG_WELD_AI"]
+            if self.plc_parser.ctw_cam["TRIG_WELD_AI"] == False:
+                self.plc_parser.stw_cam["OK_MODEL"] = False
+                self.plc_parser.stw_cam["ERROR_MODEL"] = False
+                self.prev_state_model = False
+
+            if self.plc_parser.ctw_cam['TRIG_WELD_AI'] ^ self.prev_state_model:  
+                if self.prev_state_model == True:
+                    self.plc_parser.cam_struc["ERROR"] = 0
                     continue
-
-            if self.web_trigger == False:
-                self.response['ok'] = False
-                self.response['error'] = False
-                self.response['error_code'] = 0
-                self.response['distancia'] = 0
-                self.response['imagen'] = None
-                self.prev_state = False
-                # print("---- Terminated  -> ", self.response['distancia'])
-
-            if self.web_trigger ^ self.prev_state: 
-                self.prev_state = self.web_trigger   
-                self.start_video_capture()
+                
+                self.cap = cv2.VideoCapture(self.url)
+                self.response['connected'] = self.cap.isOpened()
                 # Error de conexion
-                if not self.response['running']:
-                    print("Error opening video stream or file")                    
-                    self.response['ok'] = False
-                    self.response['error'] = True
-                    self.response['err_code'] = 1
-                    self.response['dist'] = -1
-                    self.response['img'] = None
+                if not self.cap.isOpened():
+                    print("Error opening video stream or file")
+                    self.plc_parser.stw_cam["OK_MODEL"] = False
+                    self.plc_parser.stw_cam["ERROR_MODEL"] = True
+                    self.plc_parser.cam_struc["ERROR"] = 1
+                    self.prev_state_model = self.plc_parser.ctw_cam["TRIG_WELD_AI"]
+                    self.ptz_connected = False
                     continue
-                # dist, err = self.measure_weld()
-                frame_base64 = self.read_video_capture(resize=True)
+                response_dict, image, err = self.score_weld()
+                # Process image cap for web
+                img_res = cv2.imencode('.jpg', image)[1].tobytes()
+                img_res = base64.b64encode(img_res).decode('utf-8')
+                self.imagen_resultado = img_res
 
-                dist = 34.5 + self.response['distancia']
-                err = 0
-
+                # if response dic is not a dictionarie
                 if err == 0:
-                    self.response['ok'] = True
-                    self.response['error'] = False
-                    self.response['distancia'] = dist
+                    self.plc_parser.stw_cam["OK_MODEL"] = True
+                    self.plc_parser.stw_cam["ERROR_MODEL"] = False
                 else:
-                    self.response['ok'] = False
-                    self.response['error'] = True
-                    self.response['distancia'] = -1
-
-                self.response['error_code'] = err
-                self.response['imagen'] = frame_base64
-                self.stop_video_capture()
-                print("-----------------------------------------------------", "Shooted")
+                    self.plc_parser.stw_cam["OK_MODEL"] = False
+                    self.plc_parser.stw_cam["ERROR_MODEL"] = True
+                    
+                self.plc_parser.cam_struc["ERROR"] = err
+                
+                self.prev_state_model = self.plc_parser.ctw_cam["TRIG_WELD_AI"]
+                # Update response
+                self.update_response()
+                self.cap.release()
+                print("-----------------------------------------------------", "Shooted", response_dict['name'], response_dict['confidence'])
 
     def measure_border(self):
         """Try to measure the welding 3 times, if it fails return an error
@@ -371,9 +368,10 @@ class CameraWelding(PTZCamera):
             dx2: distance between the welding and the right border of the image
             - Errors:
                 0: No error
-                1: Imagen en formato incorrecto
-                2: Fallo en la deteccion de bordes
-                3: Lectura incorrecta
+                1: No hay deteccion
+                2: Falta uno de los bordes
+                3: Cruce de toda la imagen
+                4: Error de insuficiencia en la imagen Vacio o un borde perdido
         """
         lenghts = []
         img_return = []
@@ -399,20 +397,64 @@ class CameraWelding(PTZCamera):
 
         # Verify if the measure is correct
         if len(lenghts) == 0 or np.mean(lenghts) < 0:
-            err = 3
             return -1, err, img_return
             
         return np.mean(lenghts), err, img_return
+    
+    def score_weld(self):
+        """ Try to rate the weld from an image
+            Returns:
+            response_dict: dictionary with the results of the prediction
+            image: image with the results of the prediction
+            - Error code:
+                0: No error
+                1: No deteccion
+                2: Mala soldadura
+                3: Error de confianza < 50%"""
+        self.goto_preset('Machine')
+        ret, img = self.cap.read()
+        url = 'http://192.168.90.100:5000/yolo_predict'
+        if ret:
+            # PAsar de BGR a RGB 
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            image_pil = Image.fromarray(img)
+            byte_arr = io.BytesIO()
+            image_pil.save(byte_arr, format='PNG')
+            byte_arr = byte_arr.getvalue()
+
+            # Crea el archivo para la solicitud POST
+            files = {'image': ('image.png', byte_arr)}
+            response = requests.post(url, files=files)
+
+            # Convert the response to dictionary
+            response_dict = response.json()
+            # Save the image and print the results
+            img = base64.b64decode(response_dict['image_scored'])
+            # Convierte los datos de la imagen en un array de NumPy
+            nparr = np.frombuffer(img, np.uint8)
+            # Decodifica el array de NumPy en una imagen
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            # si response_dict no es un diccionario
+            resultados = response_dict['results']
+            if not isinstance(resultados, dict):
+                print("------> Error 1: No detection")
+                return {'name': -1, 'confidence':-1}, image, 1
+            
+            elif resultados['name'] == 'good_weld' and resultados['confidence'] > 0.55:
+                return resultados, image, 0
+            
+            elif resultados['name'] == 'bad_weld' and resultados['confidence'] > 0.55:
+                print("------> Error 2: Bad welding")
+                return resultados, image, 2
+            
+            print("------> Error 3: Confidence < 50%")
+            return resultados, image, 3
+        else:
+            print('Error capturing frame from video stream')
+
 
     def start(self, app):
-
-        # Send a list of names on connection with a new client
-        # @self.socketio.on('connect', namespace='/welding_cam')
-        # def connect():
-        #     print("Client connected")
-        #     self.camera_con = False
-        #     # self.presets = self.load_presets()
-        #     self.socketio.emit('init', {'streaming_state': self.camera_con, 'presets': self.presets}, namespace='/welding_cam')
 
         @app.route('/states_welding', methods=['GET'])
         def states_welding():
@@ -428,35 +470,6 @@ class CameraWelding(PTZCamera):
             self.web_trigger = not self.web_trigger
             print("TRIG", self.web_trigger)
             return {'status': 200}
-            # try:
-            #     # data = dict(request.get_json())
-            #     # print(data)
-            #     # dist, dx1, dx2 = self.measure_weld()
-            #     # print(dist, dx1, dx2)
-            #     # return {'status': 200, 'distance': dist, 'dx1': dx1, 'dx2': dx2}
-            #     self.cap = cv2.VideoCapture(0)
-            #     ret, img = self.cap.read()
-            #     if ret:
-            #         img_base64 = base64.b64encode(img).decode('utf-8')
-            #         self.socketio.emit('image_shoot', {'frame': img_base64, 'dist': 34.6}, namespace='/welding_cam')
-            #         return {'status': 200}
-            #     else:
-            #         return {'status': 500, 'error': 1}
-            # except Exception as e:
-            #     return {'status': 500, 'error': str(e)}
-
-        # Define the route for the video stream
-        # @app.route('/video_feed')
-        # def video_feed():
-        #     cap = cv2.VideoCapture(0)
-        #     while True:
-        #         ret, frame = cap.read()
-        #         if not ret:
-        #             print("Error capturing frame from video stream")
-        #             break
-
-        #         frame = cv2.imdecode('.jpg', frame)[1].tobytes()
-        #         socketio.emit('video_frame', frame, namespace='/video')
         
         @app.route('/video_feed', methods=['POST'])
         def video_feed():
@@ -531,7 +544,27 @@ class CameraWelding(PTZCamera):
             
             return {'status': 200, 'lenght': lenght_weld, 'img': img_res, 'error': error}
             
+        @app.route('/weld_model', methods=['GET'])
+        def web_weld_model():
+            """Try to rate the weld from an image"""
+            self.cap = cv2.VideoCapture(self.url)
+            self.response['connected'] = self.cap.isOpened()
+            # Error de conexion
+            if not self.cap.isOpened():
+                return {'status': 500, 'error': 1}
             
+            response_dict, image, err = self.score_weld()
+            print("----------> Response", response_dict)
+            # Process image cap for web
+            img_res = cv2.imencode('.jpg', image)[1].tobytes()
+            img_res = base64.b64encode(img_res).decode('utf-8')
+            self.imagen_resultado = img_res
+            
+            print(f"Status: {200}", response_dict['name'], response_dict['confidence'])
+            
+            return {'status': 200, 'name': response_dict['name'], 'confidence': response_dict['confidence'], 'error': err}
+
+
 
 class CameraTail(PTZCamera):
     def __init__(self, ip, user, password):
@@ -580,11 +613,11 @@ class CameraTail(PTZCamera):
                 self.plc_parser.stw_cam["OK_TAIL"] = False
                 self.plc_parser.stw_cam["ERROR_TAIL"] = False
                 self.plc_parser.cam_struc["TAIL_MEASURE"] = 0
-                self.plc_parser.cam_struc["ERROR"] = 0
                 self.prev_state = False
 
             if self.plc_parser.ctw_cam["TRIG_TAIL"] ^ self.prev_state:
                 if self.prev_state == True:
+                    self.plc_parser.cam_struc["ERROR"] = 0
                     continue
                 self.cap = cv2.VideoCapture(self.url)
                 # Error de conexion

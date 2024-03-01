@@ -114,7 +114,7 @@ class FMC4030:
         thread.start()
 
         # Wait for 2 seconds or until the thread finishes, whichever comes first
-        thread.join(timeout=6)
+        thread.join(timeout=10)
 
         if thread.is_alive():
             print("Timeout from Status: ", self.id)

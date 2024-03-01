@@ -12,7 +12,7 @@ class EsmerilWebApp:
         self.thread_plc = None
         # variables 
         self.radio_exterior = 101
-        self.diametro_interior = 7
+        self.diametro_interior = 8
         self.dt = 0.5
         # define left and right drives
         self.plc_controller_right = None
@@ -152,7 +152,8 @@ class EsmerilWebApp:
                 error = 0
                 x_right, y_right, x_left, y_left = self.generar_trayectoria(self.diametro_interior/2, 
                                                                             self.radio_exterior, 12, 
-                                                                            (-179, -177 + 2), (-202-3, -164 + 2))
+                                                                            (-207, -179+5-1), (-225-3, -167-5))
+                                                                            
                 # verify if setpoints do not exceed the limits
                 # for i in range(len(x_right)):
                 #     if self.distancia_coor(x_right[i], y_right[i], x_left[i], y_left[i]) < 203:
@@ -191,27 +192,58 @@ class EsmerilWebApp:
                     self.move_2drives(-50, -50, -50, -300)
 
                     # Iniciar los pasos de la secuencia tomando de 3 en 3
-                    for i in range(0, len(x_right), 3):
+                    for i in range(0, len(x_right), 4):
                         # ejecutar el primero en simultaneo y los otros 2 primero el derecho luego el izquierdo
-                        res = self.move_2drives(x_right[i], y_right[i], x_left[i], y_left[i])
+                        
+                        res = self.move_1drive(x_right[i], y_right[i], "right")
                         if res == -1 or res == -2:
                             break
                         time.sleep(0.2)
+                        
                         res = self.move_1drive(x_right[i + 1], y_right[i + 1], "right")
                         if res == -1 or res == -2:
                             break
                         time.sleep(0.2)
-                        res = self.move_1drive(x_right[i + 2], y_right[i + 2], "right")
+
+                        if i+2 < len(x_right):
+                            res = self.move_1drive(x_right[i + 2], y_right[i + 2], "right")
+                            if res == -1 or res == -2:
+                                break
+                            time.sleep(0.2)
+                        else:
+                            self.plc_controller_right.abs_Move(AxePos=-50)
+
+                        # res = self.move_1drive(x_left[i], y_left[i], "left")
+                        if i+3 < len(x_right) and i != 0:
+                            res = self.move_2drives(x_right[i+3], y_right[i+3], x_left[i], y_left[i])
+                        else:
+                            self.plc_controller_right.abs_Move(AxePos=-50)
+                            res = self.move_1drive(x_left[i], y_left[i], "left")
                         if res == -1 or res == -2:
                             break
                         time.sleep(0.2)
+
+                        
                         res = self.move_1drive(x_left[i + 1], y_left[i + 1], "left")
                         if res == -1 or res == -2:
                             break
                         time.sleep(0.2)
-                        res = self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
-                        if res == -1 or res == -2:
-                            break
+
+                        if i+2 < len(x_left):
+                            res = self.move_1drive(x_left[i + 2], y_left[i + 2], "left")
+                            if res == -1 or res == -2:
+                                break
+                            time.sleep(0.2)
+                        else:
+                            self.plc_controller_left.abs_Move(AxePos=-50)
+
+
+                        if i+3 < len(x_left):
+                            res = self.move_1drive(x_left[i+3], y_left[i+3], "left")
+                            if res == -1 or res == -2:
+                                break
+                        else:
+                            self.plc_controller_left.abs_Move(AxePos=-50)
 
                     self.plc_controller_right.abs_Move(AxePos=-50)
                     self.plc_controller_left.abs_Move(AxePos=-50)
@@ -224,77 +256,62 @@ class EsmerilWebApp:
                 print(f" ++++++++++++++++++ Terminando rutina de control de esmeril: {self.plc_parser.ctw_cam['TRIG_ESME']}, {self.prev_state}")
         
 
-
-    def generar_trayectoria(self, radio:float, radio_esmeril:float, num_lados:int, right_center:tuple, left_center:tuple):
-        """ Genera una trayectoria de un poligono regular con circunferencia inscrita
-        Args:
-            radio (float): radio del poligono
-            radio_esmeril (float): radio de la circunferencia inscrita
-            num_lados (int): numero de lados del poligono, siempre par y mayor a 2
-            right_center (tuple): centro del lado derecho
-            left_center (tuple): centro del lado izquierdo
-        Returns:
-            lists: (x_right, y_right, x_left, y_left)"""
-        # Print characteristics
-        print(f"Radio: {radio}, Radio Esmeril: {radio_esmeril}, Num Lados: {num_lados}, Right Center: {right_center}, Left Center: {left_center}")
-        # raise error if num_lados is less than 3 an uneven
-        if num_lados < 3 or num_lados % 2 != 0:
-            raise ValueError("num_lados must be an even number greater than 2")
-        # Definir angulo de inicio del lado derecho 
-        angulo_init = np.pi / 2
-        # Definir longitud de trayectoria
-        path = 70
+    def generar_trayectoria(self, radio_interior, radio_esme, n, right_center, left_center):
+        # Verificar si n es par
+        if n % 2 != 0:
+            raise ValueError("n debe ser un número par")    
+        # Ángulo entre vértices
+        angulo = 2 * np.pi / n
+        angulo_interior = 2 * np.pi / n
+        # Radio es la hipotenusa del triángulo rectángulo formado por la mitad de un lado del polígono y el radio
+        radio = (radio_esme + radio_interior) / np.cos(angulo_interior / 2)
         
-        # Definir limites
-        x_limit = -215
-        y_limit = -330
-        # calcular cantidad de angulos segun el numero de lados
-        angulos = np.linspace(angulo_init, angulo_init + 2 * np.pi, num_lados, endpoint=False)
-        # Calcular los puntos (vértices del polígono excrito al radio) considerando el radio_esmeril
-        x = (radio_esmeril + radio) * np.cos(angulos)
-        y = (radio_esmeril + radio) * np.sin(angulos)
+        # Coordenadas de los vértices del polígono
+        x = []
+        y = []
+        for i in range(int(n/2) + 2):
+            print(f"Side {i} from n/2={int(n/2)}, angle: {np.degrees(i * angulo + np.pi/2)}")
+            x_i = np.cos(i * angulo + np.pi/2) * radio
+            y_i = np.sin(i * angulo + np.pi/2) * radio
+            x.append(x_i)
+            y.append(y_i)
 
-        # generar lineas tangentes a la circunferencia de radio esmeril que pasen por los puntos x, y
-        points = []
-        for i in range(num_lados):
-            # Calcular la pendiente de la recta tangente
-            m = np.arctan2(y[i],x[i]) + np.pi/2
-            # Calcular el 2 puntos de la recta tangente con la circunferencia de radio esmeril que pasa por y[i], x[i]
-            x1 = x[i] + path/2 * np.cos(m)
-            y1 = y[i] + path/2 * np.sin(m)
-            x2 = x[i] - path/2 * np.cos(m)
-            y2 = y[i] - path/2 * np.sin(m)
-            # add them to ppoints as tuple (x1, y1) (x2, y2)
-            points.append((x1, y1))
-            points.append((x2, y2))
-            points.append((x1, y1))
+        # Cada 2 elementos agregamos un punto en la lista despues de estos, la coordenada es en medio de los 2 previos con radio esme + 10
+        x_paso = []
+        y_paso = []
+        for i in range(0, len(x) + 1 , 2):
+            x_i = (radio + 20) * np.cos(i/2 * angulo + angulo/2 + np.pi / 2) 
+            y_i = (radio + 20) * np.sin(i/2 * angulo + angulo/2 + np.pi / 2)
+            x_paso.append(x_i)
+            y_paso.append(y_i)
+        
+        # Formamos la rayectoria tomando 2 puntos de x y y y 1 de x_paso y y_paso
+        x_right = []
+        y_right = []
+        for i in range(0, 2 * len(x_paso) + 2, 2):
+            x_right.append(x[i//2])
+            y_right.append(y[i//2])
+            x_right.append(x[i//2 + 1])
+            y_right.append(y[i//2 + 1])
+            x_right.append(x[i//2])
+            y_right.append(y[i//2])
+            if i <= len(y_paso) + 4:
+                x_right.append(x_paso[int(i/2)])
+                y_right.append(y_paso[int(i/2)])
+
+        
+        # Convierte las listas x e y en arreglos de NumPy
+        x_right = np.array(x_right) * -1
+        y_right = np.array(y_right)
+        #  Genera x_left y y_left reflejando x_right y y_right por el eje x
+        x_left = np.copy(x_right)
+        y_left = np.copy(-y_right)
+
+        # Transladar el polígono al centro right_center
+        x_right += right_center[0]
+        y_right += right_center[1]
+        # Transladar el polígono al centro left_center
+        x_left += left_center[0]
+        y_left += left_center[1]
             
-        # divide them in left and right from the center
-        points_right = points[:len(points)//2]
-        points_left = points[len(points)//2:]
-        # turn them  into numpy arrays
-        points_right = np.array(points_right)
-        points_left = np.array(points_left)
-        # translate them to the center
-        points_right = (points_right.round() + right_center).astype(int)
-        points_left = (points_left.round() + left_center).astype(int)
-        # invert points_right by the x axis taking right_center x as reference to reflect
-        points_right[:, 0] = 2 * right_center[0] - points_right[:, 0]
-        # recorre points right and left de 3 en tres
-        for i in range(0, len(points_right), 3):
-            for j in range(2):
-                if i + j < len(points_right):
-                    # apply x limit
-                    if points_right[i + j][0] < x_limit:
-                        points_right[i + j][0] = x_limit
-                    if points_left[i + j][0] < x_limit:
-                        points_left[i + j][0] = x_limit
-        # split points_right and points_left into x, y right and left
-        x, y = zip(*points_right)
-        x_right = list(x)
-        y_right = list(y)
-        x, y = zip(*points_left)
-        x_left = list(x)
-        y_left = list(y)
-
         return x_right, y_right, x_left, y_left
